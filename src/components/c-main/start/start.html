@@ -1,0 +1,57 @@
+<div class="start">
+	<h2 id="start">起步</h2>
+	<h3>创建项目</h3>
+	<p>
+		如果您已经成功安装 groll-cli，那么您可以通过如下命令创建一个新的项目：
+	</p>
+	<blockquote>
+		<p>
+			groll-cli init<br>
+			? Please enter the project name (project)<br>
+			? Please enter a brief introduction to the project (A project that created by groll-cli)<br>
+			? Please enter the creation author (admin)<br>
+			? Please enter the project version (1.0.0)<br>
+		</p>
+	</blockquote>
+	<p>
+		执行该命令后，需要手动输入新创建的项目信息，如果您觉得比较麻烦，可以使用 Enter 键，使用提供的默认值。创建项目完成后，会在控制台输出如下信息。
+	</p>
+	<blockquote>
+		<p style="color: green;">
+			^.^ Generated project success. please use [npm install] to install dependency.
+		</p>
+	</blockquote>
+
+	<h3>安装依赖</h3>
+	<p>
+		项目创建成功后，我们需要手动的安装一些运行依赖包资源。 安装过程很简单，在项目根目录，执行如下命令即可：
+	</p>
+	<blockquote>
+		<p>
+			npm install
+		</p>
+	</blockquote>
+	<h3>NPM 脚本</h3>
+	<p>
+		新创建的项目，使用 CLI 脚本进行构建，开发环境运行如下命令：
+	</p>
+	<blockquote>
+		<p>
+			npm run dev
+		</p>
+	</blockquote>
+	<p>
+		该命令会自动构建项目，解析依赖模块，将待构建的文件输出到 dist/version 文件夹下，并创建本地的 web 容易，方便预览和调试。打开浏览器并访问 <a href="javascript:;">http://localhost:8090</a>，就可以看到应用正常运行。
+	</p>
+	<p>
+		生产环境运行如下命令：
+	</p>
+	<blockquote>
+		<p>
+			npm run build
+		</p>
+	</blockquote>
+	<p>
+		该命令用于部署时，将静态资源构建压缩输出到 dist/version 文件夹下。
+	</p>
+</div>

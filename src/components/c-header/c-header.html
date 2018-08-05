@@ -1,0 +1,19 @@
+<div class="c-header">
+	<div class="logo"></div>
+	<div class="menu">
+		<ul>
+			<li
+				v-for="item in menu"
+				v-bind:key="item.id">
+				<a v-bind:href="item.url" v-text="item.name"></a>
+				<ul v-if="item.children.length">
+					<li
+						v-for="citem in item.children"
+						v-bind:key="citem.id">
+						<a v-bind:href="citem.url" v-text="citem.name"></a>
+					</li>
+				</ul>
+			</li>
+		</ul>
+	</div>
+</div>

@@ -1,0 +1,83 @@
+.c-header {
+	$height: 60px;
+	$space: 10px;
+
+	padding: $space 0;
+	height: $height;
+	background: #fff;
+
+	.fleft {
+		float: left;
+	}
+	.fright {
+		float: right;
+	}
+	.center {
+		text-align: center;
+	}
+	.logo {
+		@extend .fleft;
+		margin-left: $space;
+		width: calc($height * 3.5);
+		height: $height;		
+		background: url(../../assets/img/logo.png) 0 0 no-repeat;
+		background-size: cover;
+	}
+	.menu {
+		margin-right: $space;
+		@extend .fright;
+		min-width: calc($height * 2);
+		height: $height;
+		ul {
+			text-align: right;
+		
+			li {
+				position: relative;
+				margin: 0 $space;
+				display: inline-block;
+				list-style: none;
+				font-size: 1.2rem;
+				&:hover ul {
+					display: block;
+				}
+				a {
+					color: #666;
+					&:hover {
+						color: #0f67c1;						
+					}
+				}
+				ul {
+					display: none;
+					padding-top: 20px;
+					position: absolute;
+					right: -10px;
+			    top: 15px;
+			    min-width: 90px;
+			    &:before {
+			    	content:'';
+			    	position:absolute;
+			    	top: 0px;
+	    	    right: 35px;
+			    	width:0;
+			    	height:0;
+			    	border: solid 10px transparent;
+			    	border-bottom-color: #ddd;
+			    }
+					li {
+						padding: 5px 10px;
+						display: block;
+						background: #ddd;
+						font-size: 1rem;
+						text-align: center;
+						&:first-child {
+							border-radius: 5px 5px 0 0;
+						}
+						&:last-child {
+							border-radius: 0 0 5px 5px;
+						}
+					}
+				}
+			}	
+		}
+	}
+}

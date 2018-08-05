@@ -1,0 +1,28 @@
+.c-main {
+	$space: 20px;
+	padding: calc($space / 2);
+	background: #fff;
+	p {
+		line-height:calc($space * 1.5)
+	}
+	h2, h3 {
+		font-weight: 400;
+	}
+	blockquote {
+		position: relative;
+	  color: rgb(153, 153, 153);
+	  margin: 1em 0px;
+	  padding: 0.5em 0px 0.5em 2em;
+	  border: 1px solid rgb(238, 238, 238);
+	}
+	blockquote p {
+		margin: 0 0 0 -20px;
+		color: #333;
+		font-size: 14px;
+		font-family: "Microsoft YaHei";
+	}
+	b {
+		font-weight: normal;
+		color: #ff5722;
+	}
+}

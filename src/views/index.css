@@ -1,0 +1,30 @@
+@import '../assets/css/normalize.css';
+
+html, body {
+	margin: 0;
+	padding: 0;
+	color: #666;
+	font-weight: 300;
+	font-size:100%;
+}
+.container {
+	height: 100%;
+	background: #F2F2F2;
+
+	a {
+		text-decoration: none;
+	}
+}
+.back-top {
+	padding: 5px;
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	width: 35px;
+	border: 1px solid #ddd;
+	z-index: 99;
+	text-decoration: none;
+	&:hover {
+		background: #ddd;
+	}
+}

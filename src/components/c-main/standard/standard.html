@@ -1,0 +1,361 @@
+<div class="standard">
+	<h2 id="standard">工程结构</h2>
+	<p>
+		<strong>groll-cli</strong>脚手架工具就是为我们搭建了开发所需要的环境，开发者只需要在生成的项目结构的基础上进行开发即可，非常简单。为了高效的使用 groll-cli, 首先熟悉使用 groll-cli 脚手架生成的项目结构。
+	</p>
+	<blockquote>
+		<p>
+			project<br>
+			|- build<br>
+			|- config<br>
+			|- dist<br>
+			|- src		<br>
+			|- .babelrc<br>
+			|- .editorconfig<br>
+			|- .gitignore<br>
+			|- .postcssrc.json<br>
+			|- build.config.js<br>
+			|- gulpfile.js<br>
+			|- package.json<br>
+			|_ README.md<br>
+		</p>
+	</blockquote>
+	<!-- build -->
+	<h3 id="buildFolder">build 文件夹</h3>
+	<p>
+		该文件夹存放所有构建的脚本。整体构建思路如下：从指定入口 HTML 文件，扫描依赖的静态资源（图片、样式和脚本），并针对三者进行构建。也就是说，没有在入口文件中使用的静态资源，不在构建范围内，从而提升构建速度。
+	</p>
+	<blockquote>
+		<p>
+			build<br>
+			|- css.js<br>
+			|- html.js<br>
+			|- img.js<br>
+			|- rollup.js<br>
+			|- server.js<br>
+			|_ utils.js<br>
+		</p>
+	</blockquote>
+	<ul>
+		<li>
+			<label>html.js</label>
+			<p>用于对 html 文件进行构建，收集依赖的静态资源，并对静态资源（图片、样式和脚本）的 URL 地址，并根据构建环境，对 HTML 文件进行压缩等处理。输出 HTML 文件到 <b>dist/1.x.x/</b> 构建目录</p>
+		</li>
+		<li>
+			<label>img.js</label>
+			<p>
+				图片资源进行复制、添加 MD5 后缀、压缩等处理。输出图片资源到 <b>dist/version/img</b> 构建目录。
+			</p>
+		</li>
+		<li>
+			<label>css.js</label>
+			<p>
+				使用 postcss 对指定的 css 文件进行编译、添加 MD5 后缀、 资源内嵌（将指定的 css 文件以 style 标签形式内嵌，提升首屏展示效果）等处理。根据构建环境，对 css 资源进行压缩等处理，输出 css 文件到 <b>dist/version/css</b> 构建目录。
+			</p>
+		</li>
+		<li>
+			<label>rollup.js</label>
+			<p>
+				使用 rollup 模块打包器对 js 进行打包，将符合 ES 规范的小块代码编译成大块复杂的代码。支持加载 Commonjs 规范的第三方公用库。根据构建环境，对打包过后的 js 进行压缩等处理，输出相应文件到 <b>dist/version/js</b> 构建目录。
+			</p>
+		</li>
+		<li>
+			<label>server.js</label>
+			<p>
+				使用 Browsersync 构建 web 服务，同时设置相关开发环境的服务代理。Browsersync 能让浏览器实时、快速响应您的文件更改（html、js、css、sass、less等）并自动刷新页面。更重要的是 Browsersync 可以同时在PC、平板、手机等设备下进项调试。
+			</p>
+		</li>
+		<li>
+			<label>utils.js</label>
+			<p>
+				提供基础的操作工具函数，例如：情况构建文件夹，计算路径配置等。
+			</p>
+		</li>
+	</ul>
+
+	<!-- config -->
+	<h3 id="configFolder">config 文件夹</h3>
+	<p>
+		存储开发环境、单元测试环境、测试环境和部署环境配置信息，每个环境以单独文件进行维护，整体结构划分如下。	
+	</p>
+	<blockquote>
+		<p>
+			config<br>
+			|- deve.conf.js<br>
+			|- unit.conf.js<br>
+			|- prod.conf.js<br>
+			|- test.conf.js<br>
+			|_ index.js<br>
+		</p>
+	</blockquote>
+	<ul>
+		<li>
+			<label>deve.conf.js</label>
+			<p>
+				开发环境配。包含如下字段：
+			</p>
+			<ul>
+				<li>assetsPublicPath: 引入的静态资源的根路径；</li>
+				<li>useEslint: 是否启用 eslint 对构建代码进行检测，默认 true；	</li>
+				<li>host: 指定开发环境构建 web 服务 host，默认 'localhost';	</li>
+				<li>port: 指定开发环境构建 web 服务 port，默认 8090;	</li>
+				<li>open: 指定开发环境构建服务器启动时自动打开的网址，默认 true;	</li>
+				<li>proxyTable: 代理现有的服务相关配置;
+					<ul>
+						<li>target: 被代理到的主机地址；</li>
+						<li>changeOrigin：默认 true ，是否需要改变原始主机头为目标 URL；</li>
+						<li>pathRewrite：重写请求，比如: api/old-path，那么请求会被解析为 /api/new-path 。</li>
+					</ul>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<label>unit.conf.js</label>
+			<p>单元测试环境配置，待完善。</p>
+		</li>
+		<li>
+			<label>test.conf.js</label>
+			<p>测试环境相关配置。</p>
+			<ul>
+				<li>assetsPublicPath: 引入的静态资源的根路径；</li>
+				<li>proxyTable: 代理现有的服务相关配置;
+					<ul>
+						<li>target: 被代理到的主机地址；</li>
+						<li>changeOrigin：默认 true ，是否需要改变原始主机头为目标 URL；</li>
+						<li>pathRewrite：重写请求，比如: api/old-path，那么请求会被解析为 /api/new-path 。</li>
+					</ul>
+				</li>
+				<li>zip： 是否启用 zip 对静态资源压缩，并生成相应的 zip 文件，默认 false；</li>
+				<li>
+					ftp：相关配置
+					<ul>
+						<li>enabled: 是否启用，默认 false；</li>
+						<li>host: 服务主机名；</li>
+						<li>user: 登陆主机的用户名（必须有读写权限）；</li>
+						<li>password：登陆主机用户密码；</li>
+						<li>parallel：并行传输数，默认为 3</li>
+					</ul>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<label>prod.conf.js</label>
+			<p>生产环境构建相关配置。</p>
+			<ul>
+				<li>assetsPublicPath: 引入的静态资源的根路径；</li>
+				<li>proxyTable: 代理现有的服务相关配置;
+					<ul>
+						<li>target: 被代理到的主机地址；</li>
+						<li>changeOrigin：默认 true ，是否需要改变原始主机头为目标 URL；</li>
+						<li>pathRewrite：重写请求，比如: api/old-path，那么请求会被解析为 /api/new-path 。</li>
+					</ul>
+				</li>
+				<li>zip： 是否启用 zip 对静态资源压缩，并生成相应的 zip 文件，默认 false；</li>
+				<li>
+					ftp：相关配置
+					<ul>
+						<li>enabled: 是否启用，默认 false；</li>
+						<li>host: 服务主机名；</li>
+						<li>user: 登陆主机的用户名（必须有读写权限）；</li>
+						<li>password：登陆主机用户密码；</li>
+						<li>parallel：并行传输数，默认为 3</li>
+					</ul>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<label>index.js</label>
+			<p>环境配置入口文件，对外输出所有环境配置。</p>
+			<ul>
+				<li>
+					<label>version</label>
+					<p>
+						当前构建版本，构建目录会根据构建版本号创建不同的文件，如果不期望使用版本号，可以置空。
+					</p>
+				</li>
+				<li>
+					<label>entry</label>
+					<p>
+						构建页面入口（构建以页面为单位），必选项。可以以列表的方式列出每次构建的文件，也可以通过 glob 规则指定文件。例如：
+						<ul>
+							<li>
+								<b>['index', 'home']</b>: 构建 views 下的 index.html 和 home.html 文件。
+							</li>
+							<li>
+								<b>[*]</b>: 构建 views 下的所有的 html 文件。
+							</li>
+							<li>
+								<b>[index/*]</b>: 构建 views/index 下的所有的 html 文件。
+							</li>
+							<li>
+								<b>[**/*]</b>: 构建 views 下的所有文件夹下的所有 html 文件。
+							</li>
+							<li>
+								<b>[!index/*]</b>: 不构建 views/index 下的所有 html 文件。
+							</li>
+						</ul>
+					</p>
+				</li>
+				<li>
+					<label>inline</label>
+					<p>
+						是否以内嵌(使用 style 和 script 标签将 css 和 js 直接写入到页面，提升页面渲染时间)的方式对引入的 css 和 js 进行处理。默认 css 使用内嵌方式。
+					</p>
+				</li>
+				<li>
+			</ul>
+		</li>
+	</ul>
+
+	<!-- dist -->
+	<h3 id="distFolder">dist 文件夹</h3>
+	<p>存储以版本号进行管理，经过一系列编译处理（资源压缩、MD5化等）的静态资源。</p>
+	<blockquote>
+		<p>
+			dist<br>
+			|- 1.0.0<br>
+			|- 1.0.1<br>
+			&emsp;|- css<br>
+			&emsp;&emsp;|- reset-594dcdwd46.css<br>
+			&emsp;&emsp;|- index-iou8902ndf.css<br>
+			&emsp;|- font<br>
+			&emsp;&emsp;|- fontawesome-webfont.ttf<br>
+			&emsp;|- img<br>
+			&emsp;&emsp;|- logo-aedfjsdk2sd.png<br>
+			&emsp;|- js<br>
+			&emsp;&emsp;|- index-89fdjduejnd.js<br>
+			&emsp;&emsp;|- vue.min.js<br>
+			&emsp;|_ index.html<br>
+			|_ 1.x.x<br>
+		</p>
+	</blockquote>
+	<p>
+		注意，构建目录和开发源码目录不一样，所有资源均归类到一级文件夹下。
+	</p>
+
+	<!-- src -->
+	<h3 id="srcFolder">src 文件夹</h3>
+	<p>存储未作任何处理的静态资源，是开发者组织静态资源、编写核心业务逻辑的地方。</p>
+	<blockquote>
+		<p>
+			src		<br>
+			|- assets<br>
+			&emsp;|- img<br>
+			&emsp;|- css<br>
+			&emsp;|- font<br>
+			&emsp;|_ lib<br>
+			|- components<br>
+			&emsp;|_ helloworld<br>
+			&emsp;&emsp;|- helloworld.html<br>
+			&emsp;&emsp;|- helloworld.css<br>
+			&emsp;&emsp;|_ helloworld.js<br>
+			|- mock<br>
+			|_ views<br>
+			&emsp;|- img<br>
+			&emsp;&emsp;|_ idx-icon.png<br>
+			&emsp;|- index.html<br>
+			&emsp;|- index.js<br>
+			&emsp;|_ index.css<br>
+		</p>
+	</blockquote>
+	<ul>
+		<li>
+			<label>assets 文件夹</label>
+			<p>
+				该文件夹存储模块化和第三方资源。
+				<ul>
+					<li>
+						<label>img</label>
+						<p>
+							存储跨页面或模块使用的公用图片，图片格式不限，在 css 或者 html 中可以通过相对路径的方式引用，构建工具会自动解析路径。
+						</p>
+					</li>
+					<li>
+						<label>css</label>
+						<p>
+							存储跨页面或模块使用的 css, 如果第三方资源，不以 URL 的方式引入，也存储在该文件夹下，在 html 中可以通过相对路径的方式引用。
+						</p>
+					</li>
+					<li>
+						<label>font</label>
+						<p>
+							存储跨字体文件,在 css 中可以通过相对路径的方式引用。
+						</p>
+					</li>
+					<li>
+						<label>lib</label>
+						<p>
+							存储第三方公用js库或者框架,在 html 中可以通过相对路径的方式引用。
+						</p>
+					</li>
+				</ul>
+			</p>
+		</li>
+		<li>
+			<label>components 文件夹</label>
+			<p>
+				存储模块化资源，模块化规范严格遵循 ES 规范，即使用 export 对外输出本模块变量的接口，使用 import 导入一个模块 export 接口。
+			</p>
+		</li>
+		<li>
+			<label>mock 文件夹</label>
+			<p>
+				存储 mock 接口文件，约定采用 json 格式的文件，在 js 中可以直接通过 <b>import data from 'xx.json'</b> 方式使用。
+			</p>
+		</li>
+		<li>
+			<label>views 文件夹</label>
+			<p>
+				存储页面文件，如果页面较多，建议使用文件夹的方式进行组织，例如：<b>view/user/user.html</b>、<b>view/user/list.html</b>。注意：引入的 css 和 js 以相对当前页面的路径引入，底层自动解析路径。以页面为单位组织静态资源，即该页面特有的样式、脚本和图片资源，以就近原则，存储在该页面周围，方便后续的插拔扩展。
+				<ul>
+					<li>
+						<label>html 文件</label>
+						<p>
+							严格使用 HTML5 标准声明。
+						</p>
+					</li>
+					<li>
+						<label>js 文件</label>
+						<p>
+							js 遵循 ES 规范，对于第三方资源，尽可能使用 NPM 或者 CDN 方式使用。对于 Commonjs 规范的包，可以直接按照规范使用，底层做兼容处理。
+						</p>
+					</li>
+					<li>
+						<label>css 文件</label>
+						<p>
+							css 通过 postcss 处理，支持 sass 语法规则，如果你对主流 css 预处理器 less/sass/stylus 中任意一种熟悉的话，可以零成本快速开发。
+						</p>
+					</li>
+				</ul>
+			</p>
+		</li>
+	</ul>
+
+	<h3 id="otherFile">其他文件</h3>
+	<ul>
+		<li>
+			<label>.babelrc</label>
+			<p>
+				Babel转换器配置文件，能让我们可以在项目中使用ES6/7来编写代码。
+			</p>
+		</li>
+		<li>
+			<label>.eslintrc</label>
+			<p>
+				ES6校验配置文件，Lint功能可以帮你保持代码风格的统一。
+			</p>
+		</li>
+		<li>
+			<label>package.json</label>
+			<p>
+				npm配置文件，其中列出了项目使用到的第三方依赖包。 你还可以在这里添加自己的自定义脚本。
+			</p>
+		</li>
+		<li>
+			<label>gulpfile.js</label>
+			<p>
+				Gulp 配置文件，构建编译的入口文件。
+			</p>
+		</li>
+	</ul>
+</div>
