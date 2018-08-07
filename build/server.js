@@ -2,9 +2,9 @@ const gulp = require('gulp');
 const browserSync = require('browser-sync').create(); // browsersync
 const proxyMiddleware = require('http-proxy-middleware'); // proxy
 const conf = require('../config');
-const dev = conf.deve;
+const dev = conf.development;
 
-gulp.task('server', () => {
+module.exports.create = function() {
 	let proxyTable = dev.proxyTable,
 		proxys = [];
 
@@ -21,7 +21,7 @@ gulp.task('server', () => {
 
 	browserSync.init({
 		server: {
-	    baseDir: `./dist/${conf.version}/`,
+	    baseDir: `../dist/${conf.version}/`,
 	    middleware: proxys
 	  },
 	  host: dev.host,
@@ -49,6 +49,5 @@ gulp.task('server', () => {
 		}
 	});
 	console.log(`[^_^] Server: listening on port ${dev.port}, Accessing in: http://${dev.host}:${dev.port}`);
-});
-
-module.exports = browserSync;
+};
+module.exports.browserSync = browserSync;

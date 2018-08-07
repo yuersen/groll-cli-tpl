@@ -1,18 +1,10 @@
-const gulp = require('gulp');
-const plumber = require('gulp-plumber');
-const flatten = require('gulp-flatten'); // 移除多余的路径
-const rev = require('gulp-rev'); // 添加版本号
-const revCollector = require('gulp-rev-collector');
-
-const postcss = require('gulp-postcss');
-const postcssCopy = require('postcss-copy');
-const autoprefixer = require('autoprefixer');
-const cssnano = require('cssnano');
-const precss = require('precss');
-const atImport = require("postcss-import")
-
 const utils = require('./utils.js');
-const entry = require('./html.js');
+
+const gulp = utils.publicDeps.gulp;
+const plumber = utils.publicDeps.plumber;
+const flatten = utils.publicDeps.flatten; // 移除多余的路径
+const rev = utils.publicDeps.rev; // 添加版本号
+const revCollector = utils.publicDeps.revCollector;
 
 /**
  * less 文件处理
@@ -22,33 +14,33 @@ const entry = require('./html.js');
  * 4.输出到指定目录
  * 5.生成 manifest.json 文件
  */
-gulp.task('build:css', function() {
-	return gulp.src(entry.css)
+module.exports.build = function() {
+  console.log('[CFT] Compiling css file.');
+	return gulp.src(utils.entry.css)
 		.pipe(plumber())
 		.pipe(
-			postcss([
+			require('gulp-postcss')([
         // @import 查找路径
-        atImport({
+        require('postcss-import')({
           path: ['src/assets/css']
         }),
         // An async postcss plugin to copy all assets referenced in CSS files 
         // to a custom destination folder and updating the URLs.
-        postcssCopy({
+        require('postcss-copy')({
           basePath: ['src'],
           dest: utils.destBasePath,
           template(fileMeta) {
             return 'img/' + fileMeta.name + fileMeta.hash.substr(8) + '.' + fileMeta.ext;
           }
         }),
-        precss(),
-        // assets(),
-        autoprefixer(),
-        cssnano()
+        require('precss')(),
+        require('autoprefixer')(),
+        require('postcss-csso')()
 			])
 		)
 		.pipe(rev())
 		.pipe(flatten())
-		.pipe(gulp.dest(utils.destCssPath))
+		.pipe(gulp.dest(utils.dest.css))
 		.pipe(rev.manifest('rev-css-manifest.json'))
-    .pipe(gulp.dest(utils.revPath));
-});
+    .pipe(gulp.dest(utils.dest.rev));
+};

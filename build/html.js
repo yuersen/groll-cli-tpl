@@ -1,24 +1,26 @@
-const gulp = require('gulp');
 const path = require('path');
-const plumber = require('gulp-plumber');
-const through2 = require('through2');
 const prefix = require('gulp-prefix'); // 添加前缀
 const flatten = require('gulp-flatten'); // 移除多余的路径
 const gulpif = require('gulp-if');
+const rev = require('gulp-rev'); // 添加版本号
 const revCollector = require('gulp-rev-collector');
 const htmlmin = require('gulp-htmlmin'); // html 压缩组件
 const gulpRemoveHtml = require('gulp-remove-html'); // 标签清除
 const removeEmptyLines = require('gulp-remove-empty-lines'); // 清除空白行
 const inlinesource = require('gulp-inline-source');
-const utils = require('./utils.js');
-const conf = require('../config');
 
-let entry = {
-	img: [],
-	compiledJs: [],
-	unCompiledJs: [],
-	css: []
-};
+const conf = require('../config');
+const utils = require('./utils.js');
+
+// 新增公用依赖包
+utils.publicDeps['flatten'] = flatten;
+utils.publicDeps['rev'] = rev;
+utils.publicDeps['revCollector'] = revCollector;
+utils.publicDeps['gulpif'] = gulpif;
+
+const gulp = utils.publicDeps.gulp;
+const plumber = utils.publicDeps.plumber;
+const through2 = utils.publicDeps.through2;
 
 /**
  * 处理 HTML 文件中引入的资源
@@ -31,11 +33,11 @@ function processResource(match, capture, dirname, type, inline) {
 		return match;
 	}
 	if (capture.indexOf('assets@') !== -1) {
-		entry[type === 'js' ? 'unCompiledJs': type].push(
+		utils.entry[type === 'js' ? 'uncompiledjs': type].push(
 			path.resolve(__dirname, capture.replace(/assets@/gi, '../src/assets/'))
 		);
 	} else {
-		entry[type === 'js' ? 'compiledJs': type].push(
+		utils.entry[type === 'js' ? 'compiledjs': type].push(
 			path.resolve(dirname, capture)
 		);
 	}
@@ -48,8 +50,9 @@ function processResource(match, capture, dirname, type, inline) {
  * 2.处理 script、link、image 标签 url 前缀
  * 3.移除相对路径
  */
-gulp.task('build:html', function() {
-	return gulp.src(utils.htmlEntry)
+module.exports.build = function() {
+	console.log('[CFT] Compiling html file.');
+	return gulp.src(utils.entry.html)
 		.pipe(plumber())
 		.pipe(through2.obj((file, enc, callback) => {
 			// buffer to string
@@ -81,7 +84,7 @@ gulp.task('build:html', function() {
 		.pipe(flatten())
 		.pipe(
 			gulpif(
-				utils.env !== 'deve', 
+				utils.env !== 'development', 
 				gulpRemoveHtml(), // 清除特定标签
 				removeEmptyLines({removeComments: true}), // 清除空白行
 				htmlmin({
@@ -96,23 +99,21 @@ gulp.task('build:html', function() {
 				})
 			)
 		)
-		.pipe(gulp.dest(utils.destHtmlPath));
-});
+		.pipe(gulp.dest(utils.dest.html));
+};
 
 /**
  * html 替换 css、js、图片 文件版本
  */
-gulp.task('rev:html', () => {
+module.exports.rev = function() {
 	return gulp.src([
-			utils.revPath + '*.json',
-			utils.destHtmlPath + '*.html'
+			utils.dest.rev + '*.json',
+			utils.dest.html + '*.html'
 		])
 		.pipe(plumber())
 		.pipe(revCollector())
 		.pipe(inlinesource())
 		// 处理 script、link、image 标签 url 前缀
 		.pipe(prefix(conf[utils.env].assetsPublicPath))
-		.pipe(gulp.dest(utils.destHtmlPath));
-});
-
-module.exports = entry;
+		.pipe(gulp.dest(utils.dest.html));
+};

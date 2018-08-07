@@ -10,59 +10,72 @@
  */
 const gulp = require('gulp');
 const path = require('path');
-const zip = require('gulp-zip');
-const ftp = require('vinyl-ftp');
 const plumber = require('gulp-plumber');
 const del = require('del');
+const zip = require('gulp-zip');
 const through2 = require('through2');
 const conf = require('../config');
 const pkg = require('../package.json');
-const env = process.env.NODE_ENV.substr(0, 4);
 
-let htmlEntry = [];
-let destBasePath = `./dist/${conf.version ? conf.version + '/' : ''}`;
+let destBasePath = `../dist/${conf.version ? conf.version + '/' : ''}`;
+let entry = {
+	html: [],
+	css: [],
+	img: [],
+	compiledjs: [],
+	uncompiledjs: []
+};
+let dest = {
+	base: destBasePath,
+	html: destBasePath,
+	css: `${destBasePath}css/`,
+	img: `${destBasePath}img/`,
+	js: `${destBasePath}js/`,
+	rev: `${destBasePath}dev/`
+};
+let env = process.env.NODE_ENV.trim();
 
 /**
  * 清理上次构建文件
  * 所有任务的开始
  */
-gulp.task('clean', (cb) => {
-	return del([
-		destBasePath // 清除当前版本下的文件
-	]).then(paths => {
-		// TODO
+module.exports.clean = function clean() {
+	return del.sync([
+		destBasePath + '**' // 清除当前版本下的文件
+	], {
+		force: true // Allow deleting the current working directory and outside.
 	});
-});
+}
 
 /**
  * 构建入口
  */
-gulp.task('entry', ['clean'], () => {
-	let entry = conf.entry.map((val) => {
-		return `./src/views/${val}.html`;
+module.exports.getEntryTask = function() {
+	let htmlEntry = conf.entry.map((val) => {
+		return `../src/views/${val}.html`;
 	});
 
-	return gulp.src(entry)
+	return gulp.src(htmlEntry)
 		.pipe(plumber())
 		.pipe(through2.obj((file, enc, callback) => {
 			let filename = path.basename(file.path, '.html');
-			htmlEntry.push(file.path);
+			entry.html.push(file.path);
 			callback();
 		}));
-});
+}
 
 /**
  * 判断是否网络资源
  * http/https
  */
-function detectNetwork(url) {
+module.exports.detectNetwork = function(url) {
 	return /^(https|http):\/\/?/.test(url);
 }
 
 /**
  * 根据路径获取相关信息
  */
-function getInfoFromPath(filepath) {
+module.exports.getInfoFromPath = function(filepath) {
 	let basename = path.basename(filepath),
 		dirname = path.dirname(filepath),
 		extname = path.extname(filepath);
@@ -78,40 +91,40 @@ function getInfoFromPath(filepath) {
 /**
  * zip
  */
-gulp.task('zip', () => {
+module.exports.zipTask = function() {
 	if (conf[env].zip) {
 		return gulp.src(destBasePath + '*')
 		.pipe(zip(`${pkg.name}${conf.version}.zip`))
-		.pipe(gulp.dest('dist'));
+		.pipe(gulp.dest(destBasePath));
 	}
 	return null;
-});
+};
 
 /**
  * ftp
  */
-gulp.task('ftp', () => {
+module.exports.ftpTask = function() {
 	let ftpconf = conf[env].ftp;
 
 	if (ftpconf.enabled) {
-		var conn = ftp.create(Object.assgin({}, ftpconf));
+		var conn = require('vinyl-ftp').create(Object.assgin({}, ftpconf));
 		return gulp.src(destBasePath + '**', {base: '.', buffer: false})
 			.pipe(conn.dest(`/${pkg.name}`))
 	}
 	return null;
-})
-
-module.exports = {
-	env: env,
-	htmlEntry: htmlEntry,
-
-	destBasePath: destBasePath,
-	revPath: `${destBasePath}dev/`,
-	destHtmlPath: destBasePath,
-	destImgPath: `${destBasePath}img/`,
-	destJsPath: `${destBasePath}js/`,
-	destCssPath: `${destBasePath}css/`,
-
-	detectNetwork: detectNetwork,
-	getInfoFromPath: getInfoFromPath
 };
+
+module.exports.entry = entry;
+module.exports.dest = dest;
+module.exports.env = env;
+
+/**
+ * 公用依赖包
+ * 将公用依赖包存储，防止二次加载
+ */
+module.exports.publicDeps = {
+	gulp: gulp,
+	plumber: plumber,
+	through2: through2
+};
+console.log('[CFT] Compiling...');

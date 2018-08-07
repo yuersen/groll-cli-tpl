@@ -1,12 +1,5 @@
-const gulp = require('gulp');
 const path = require('path');
-const through2 = require('through2');
-const plumber = require('gulp-plumber');
 const rollupEach = require('gulp-rollup-each');
-const flatten = require('gulp-flatten'); // 移除多余的路径
-const rev = require('gulp-rev'); // 添加版本号
-const revCollector = require('gulp-rev-collector');
-const gulpif = require('gulp-if');
 const uglify = require('gulp-uglify');
 const rollup = require('rollup'); // rollup and plugin
 const babel = require('rollup-plugin-babel');
@@ -14,27 +7,27 @@ const eslint = require('rollup-plugin-eslint').eslint;
 const resolve = require('rollup-plugin-node-resolve');
 const commonjs = require('rollup-plugin-commonjs');
 const json = require('rollup-plugin-json');
-const posthtml = require('rollup-plugin-posthtml-template');
-const includePaths = require('rollup-plugin-includepaths');
 const postcss = require('rollup-plugin-postcss');
-const postcssCopy = require('postcss-copy'); // postcss
-const autoprefixer = require('autoprefixer');
-const cssnano = require('cssnano');
-const precss = require('precss');
-const atImport = require("postcss-import")
-const include = require('posthtml-include');
-const postExtend = require('postcss-extend');
+
 const utils = require('./utils.js'); // config
-const entry = require('./html.js');
 const conf = require('../config');
 
-let useEslint = conf.deve.useEslint;
+const gulp = utils.publicDeps.gulp;
+const through2 = utils.publicDeps.through2;
+const plumber = utils.publicDeps.plumber;
+const flatten = utils.publicDeps.flatten; // 移除多余的路径
+const rev = utils.publicDeps.rev; // 添加版本号
+const revCollector = utils.publicDeps.revCollector;
+const gulpif = utils.publicDeps.gulpif;
+
+let useEslint = conf.development.useEslint;
 
 /**
  * 使用 rollup 构建 js
  */
-gulp.task('compile:js', () => {
-  return gulp.src(entry.compiledJs)
+module.exports.build = function() {
+  console.log('[CFT] Compiling js file.');
+  return gulp.src(utils.entry.compiledjs)
     .pipe(plumber())
     .pipe(
       rollupEach({ // inputOptions
@@ -42,29 +35,29 @@ gulp.task('compile:js', () => {
         external: ['vue'],
         // 使用的插件列表
         plugins: [
-          includePaths({ // 处理相对路径
+          require('rollup-plugin-includepaths')({ // 处理相对路径
             include: {},
-            paths: ['src/views', 'src/components', 'src/mock', 'node_modules'],
+            paths: ['../src/views', '../src/components', '../src/mock', '../node_modules'],
           }),
-          posthtml({ // post html
-            plugins: [include()]
+          require('rollup-plugin-string')({
+            include: '../src/**/*.html'
           }),
           postcss({ // post CSS
             plugins: [
-              atImport({
-                path: ['src/assets/css']
+              require("postcss-import")({
+                path: ['../src/assets/css', '../src/views']
               }),
-              postcssCopy({ // 拷贝 css 中的图片到指定文件夹
-                basePath: ['src'],
-                dest: utils.destBasePath,
+              require('postcss-copy')({ // 拷贝 css 中的图片到指定文件夹
+                basePath: ['../src'],
+                dest: utils.dest.base,
                 template(fileMeta) {
                   return 'img/' + fileMeta.name + fileMeta.hash.substr(8) + '.' + fileMeta.ext;
                 }
               }),
-              postExtend(),
-              precss(),
-              autoprefixer(),
-              cssnano()
+              require('postcss-extend')(),
+              require('precss')(),
+              require('autoprefixer')(),
+              require('postcss-csso')()
             ],
             extensions: ['.css']
           }),
@@ -76,12 +69,12 @@ gulp.task('compile:js', () => {
           }),
           commonjs(), // support commonjs
           babel({ // babel
-            exclude: 'node_modules/**'
+            exclude: '../node_modules/**'
           }),
           (useEslint && eslint({
-            include: 'src/**/*.js',
+            include: '../src/**/*.js',
             exclude: [
-              'node_modules/**'
+              '../node_modules/**'
             ]
           }))
         ]
@@ -97,16 +90,14 @@ gulp.task('compile:js', () => {
     )
     .pipe(rev())
 		.pipe(flatten())
-		.pipe(gulpif(utils.env !== 'deve', uglify()))
-    .pipe(gulp.dest(utils.destJsPath))
+		.pipe(gulpif(utils.env !== 'development', uglify()))
+    .pipe(gulp.dest(utils.dest.js))
     .pipe(rev.manifest('rev-js-manifest.json'))
-    .pipe(gulp.dest(utils.revPath));
-});
+    .pipe(gulp.dest(utils.dest.rev));
+};
 
-gulp.task('uncompile:js', () => {
-  return gulp.src(entry.unCompiledJs)
+module.exports.unbuild = function() {
+  return gulp.src(utils.entry.uncompiledjs)
     .pipe(flatten())
-    .pipe(gulp.dest(utils.destJsPath));
-});
-
-gulp.task('build:js', ['compile:js', 'uncompile:js']);
+    .pipe(gulp.dest(utils.dest.js));
+};
