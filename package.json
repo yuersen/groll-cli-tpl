@@ -51,6 +51,7 @@
     "rollup-plugin-json": "^3.0.0",
     "rollup-plugin-node-resolve": "^3.3.0",
     "rollup-plugin-postcss": "^1.6.2",
+    "rollup-plugin-re": "^1.0.7",
     "rollup-plugin-string": "^2.0.2",
     "run-sequence": "^2.2.1",
     "through2": "^2.0.3",

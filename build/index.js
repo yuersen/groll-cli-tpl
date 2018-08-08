@@ -15,6 +15,7 @@ gulp.task('build:css', css.build);
 gulp.task('build:img', img.build);
 gulp.task('compile:js', roll.build);
 gulp.task('uncompile:js', roll.unbuild);
+gulp.task('rev:js', roll.rev);
 gulp.task('zip', utils.zipTask);
 gulp.task('ftp', utils.ftpTask);
 gulp.task('server', server.create);
@@ -25,9 +26,9 @@ gulp.task('watch', () => {
 			'entry',
 			'build:html',
 			'build:css',
-			'build:img',
 			['compile:js', 'uncompile:js'],
-			'rev:html', 
+			'build:img',
+			['rev:html', 'rev:js'], 
 			() => {
 				server.browserSync.reload();
 			}
@@ -42,9 +43,9 @@ gulp.task('development', (cb) => {
 		'entry',
 		'build:html',
 		'build:css',
-		'build:img',
 		['compile:js', 'uncompile:js'],
-		'rev:html', 
+		'build:img',
+		['rev:html', 'rev:js'], 
 		['server', 'watch'],
 		cb
 	);
@@ -57,9 +58,9 @@ gulp.task('production', (cb) => {
 		'entry',
 		'build:html',
 		'build:css',
-		'build:img',
 		['compile:js', 'uncompile:js'],
-		'rev:html', 
+		'build:img',
+		['rev:html', 'rev:js'],
 		'zip',
 		'ftp',
 		cb
