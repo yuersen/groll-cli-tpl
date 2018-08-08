@@ -11,6 +11,13 @@ module.exports = {
 		style: true,
 		script: false
 	},
+	rollup: {
+		external: ['vue', 'axios'], // 第三方，忽略打包
+		globals: { // 全局变量
+      vue: 'Vue',
+      axios: 'axios'
+    }
+	},
 
 	// 开发环境
 	development: { 

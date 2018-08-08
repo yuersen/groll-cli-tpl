@@ -34,7 +34,7 @@ module.exports.build = function() {
     .pipe(
       rollupEach({ // inputOptions
         // 排除的文件
-        external: ['vue'],
+        external: conf.rollup.external,
         // 使用的插件列表
         plugins: [
           require('rollup-plugin-includepaths')({ // 处理相对路径
@@ -100,9 +100,7 @@ module.exports.build = function() {
         return {
           format: 'iife',
           name: path.basename(file.path, '.js'),
-          globals: {
-            vue: 'Vue'
-          }
+          globals: conf.rollup.globals
         };
       }, rollup)
     )
