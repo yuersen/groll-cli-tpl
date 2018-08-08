@@ -60,7 +60,8 @@ module.exports.build = function() {
 				dirname = path.dirname(file.path);
 
 			content = content
-				.replace(/<img[^>]*src=['"]([^'"]+)[^>]*>/gi, (match, capture) => {
+				// 忽略类似：src 的vue语法
+				.replace(/<img[^(>|:)]*src=['"]([^'"]+)[^>]*>/gi, (match, capture) => {
 					// 1.扫描内容，收集 HTML 中使用的图片
 					return processResource(match, capture, dirname, 'img', '');
 				})
