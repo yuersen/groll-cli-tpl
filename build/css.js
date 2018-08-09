@@ -28,7 +28,7 @@ module.exports.build = function() {
         // to a custom destination folder and updating the URLs.
         require('postcss-copy')({
           basePath: ['src'],
-          dest: utils.destBasePath,
+          dest: utils.dest.css,
           template(fileMeta) {
             return 'img/' + fileMeta.name + fileMeta.hash.substr(8) + '.' + fileMeta.ext;
           }
