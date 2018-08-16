@@ -2,7 +2,7 @@
 
 groll-cli 是一种命令行接口脚手架工具，实现自动化开发流程，它可以创建项目、添加文件以及执行一大堆开发任务，比如测试、打包和发布。
 
-创建的项目，使用 gulp 和 rollup 对静态资源进行打包处理。 Gulp 是一个自动化构建工具,开发者可以使用它在项目开发过程中自动执行常见任务。Rollup 是一个 JavaScript 模块打包器，可以将小块代码编译成大块复杂的代码，例如 library 或应用程序。如果您对两者不熟悉，这里是官网： [Gulp](https://www.gulpjs.com.cn/), [rollup](https://rollupjs.cn/)。
+创建的项目，使用 rollup 和 less 对静态资源进行打包处理。Rollup 是一个 JavaScript 模块打包器，可以将小块代码编译成大块复杂的代码，例如 library 或应用程序。如果您对两者不熟悉，这里是官网： [rollup](https://rollupjs.cn/)。
 
 ## 安装
 
