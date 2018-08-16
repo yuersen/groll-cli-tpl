@@ -1,68 +1,60 @@
-const runSequence = require('run-sequence');
-const utils = require('./utils.js');
+const del = require('del');
+const chokidar = require('chokidar');
+const dest = require('./dest.js');
 const html = require('./html.js');
 const css = require('./css.js');
-const img = require('./img.js');
 const roll = require('./rollup.js');
+const utils	= require('./utils.js');
+const img = require('./img.js');
+const font = require('./font.js');
 const server = require('./server.js');
-const gulp = utils.publicDeps.gulp;
+const base = require('./base.js');
+const path = require('path');
+const storage = require('./storage.js');
 
-gulp.task('clean', utils.clean);
-gulp.task('entry', utils.getEntryTask);
-gulp.task('build:html', html.build);
-gulp.task('rev:html', html.rev);
-gulp.task('build:css', css.build);
-gulp.task('build:img', img.build);
-gulp.task('compile:js', roll.build);
-gulp.task('uncompile:js', roll.unbuild);
-gulp.task('rev:js', roll.rev);
-gulp.task('zip', utils.zipTask);
-gulp.task('ftp', utils.ftpTask);
-gulp.task('server', server.create);
+/**
+ * 构建所有静态资源
+ */
+function build(callback) {
+	// 首先把图片白名单放入storage
+	utils.collectImgInJs(base.img.white);
 
-gulp.task('watch', () => {
-	return gulp.watch('../src/**/*', () => {
-		runSequence(
-			'entry',
-			'build:html',
-			'build:css',
-			['compile:js', 'uncompile:js'],
-			'build:img',
-			['rev:html', 'rev:js'], 
-			() => {
-				server.browserSync.reload();
-			}
-		);
-	});
+	// 从命令行获取构建入口
+	// 如果没有指定，则使用配置 config/index.js 中的 entry 作为入口
+	html.build(process.argv.slice(2))
+		.then(() => {
+			Promise.all([roll.build(storage.getJs()), css.build(storage.getCss())])
+				.then(() => {
+					Promise.all([img.build(storage.getImg()),	font.build(storage.getFont())])
+						.then(() => {
+							callback && callback();
+						});
+				});
+		});
+}
+
+del(dest.base, {force: true}).then(() => {
+	utils.log('Start building, please wait a moment.');
+	if (process.env.NODE_ENV === 'development') {
+		build(() => {
+			// 创建服务，监听文件变化
+			server.create();
+			chokidar.watch([
+				'./src/**/*.html',
+				'./src/**/*.js',
+				'./src/**/*.css'
+			]).on('change', (path, stats) => {
+				build(() => {
+					server.browserSync.reload();
+				});
+			});
+		});
+	}
+	else {
+		build();
+	}
 });
 
-// 开发环境
-gulp.task('development', (cb) => {
-	runSequence(
-		'clean',
-		'entry',
-		'build:html',
-		'build:css',
-		['compile:js', 'uncompile:js'],
-		'build:img',
-		['rev:html', 'rev:js'], 
-		['server', 'watch'],
-		cb
-	);
-});
 
-// 测试和生产环境
-gulp.task('production', (cb) => {
-	runSequence(
-		'clean',
-		'entry',
-		'build:html',
-		'build:css',
-		['compile:js', 'uncompile:js'],
-		'build:img',
-		['rev:html', 'rev:js'],
-		'zip',
-		'ftp',
-		cb
-	);
-});
+
+

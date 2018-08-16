@@ -1,27 +1,71 @@
+/**
+ * 对 img 文件进行处理
+ * 1. 合并配置指定图片列表，html中使用图片列表
+ * 2. manifest 化处理
+ * 3. 压缩
+ */
+const fs = require('fs-extra');
+const path = require('path');
+const imagemin = require('imagemin');
+const dest = require('./dest.js');
 const utils = require('./utils.js');
 
-const gulp = utils.publicDeps.gulp;
-const plumber = utils.publicDeps.plumber;
-const flatten = utils.publicDeps.flatten; // 移除多余的路径
-const rev = utils.publicDeps.rev; // 添加版本号
-const revCollector = utils.publicDeps.revCollector;
-const gulpif = utils.publicDeps.gulpif;
+/**
+ * 扫描图片，并做复制、压缩处理
+ * @param  {String} imgPath - 图片路径
+ * @param  {String} alias - 图片别名
+ * @return {Promise}
+ */
+function scan(imgPath, alias) {
+	return new Promise((resolve, reject) => {
+		if (process.env.NODE_ENV === 'development') {
+			fs.copy(imgPath, `${dest.img}${alias}`)
+				.then(() => {
+					resolve();
+				})
+				.catch(err => {
+					reject({
+						title: `Copy ${imgPath} file failed.`,
+						message: new Error(err)
+					});
+				});
+		}
+		else { // 压缩处理
+			imagemin([imgPath], dest.img).then(() => {
+				fs.rename(`${dest.img}${path.basename(imgPath)}`, `${dest.img}${alias}`);
+				resolve();
+			});
+		}
+	}).catch(err => {
+		utils.error(err);
+	});
+}
 
 /**
- * 构建规则：
- * 	1.当前模块img文件全部拷贝
- * 	2.动态扫描html和css中的使用的公用图片，并将其加入到构建目录中
- * 	3.只处理 html 中引入的图片，css中，单独处理
+ * 构建图片
+ * @param {Object[]} imgList - 图片文件信息列表
+ * @param {String} imgList[].extname - 后缀
+ * @param {String} imgList[].absolute - 绝对路径
+ * @param {String} imgList[].basename - 文件名
+ * @param {String} imgList[].alias - 文件别名，即文件名 + MD5(absolute)
+ * @return {Promise}
  */
-module.exports.build = function() {
-	console.log('[CFT] Compiling image file.');
-	return gulp.src(utils.entry.img)
-		.pipe(plumber())
-		.pipe(rev())
-		.pipe(flatten())
-		// 生产环境图片处理
-		.pipe(gulpif(utils.env !== 'development', require('gulp-imagemin')()))
-		.pipe(gulp.dest(utils.dest.img))
-    .pipe(rev.manifest('rev-img-manifest.json'))
-    .pipe(gulp.dest(utils.dest.rev));
-}
+module.exports.build = function (imgList) {
+	return new Promise((resolve, reject) => {
+		let promises = [];
+		let keys = Object.keys(imgList);
+
+		if (!keys.length) {
+			return resolve();
+		}
+
+		keys.forEach(imgPath => {
+			promises.push(scan(imgPath, imgList[imgPath].alias));
+		});
+
+		Promise.all(promises).then(result => {
+			resolve();
+			utils.log('Finish compiling image files.');
+		});
+	});
+};

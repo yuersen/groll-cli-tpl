@@ -1,119 +1,150 @@
+/**
+ * 处理 html 文件
+ * @author pxy0809
+ * 1. 扫描指定的 html 中的 js/css/img，http/https 资源忽略
+ * 2. 根据生成的 manifest 进行相应处理
+ * 3. 判断当前构建环境，压缩输出 html 到指定路径
+ */
+const fs = require('fs');
 const path = require('path');
-const prefix = require('gulp-prefix'); // 添加前缀
-const flatten = require('gulp-flatten'); // 移除多余的路径
-const gulpif = require('gulp-if');
-const rev = require('gulp-rev'); // 添加版本号
-const revCollector = require('gulp-rev-collector');
-const htmlmin = require('gulp-htmlmin'); // html 压缩组件
-const gulpRemoveHtml = require('gulp-remove-html'); // 标签清除
-const removeEmptyLines = require('gulp-remove-empty-lines'); // 清除空白行
-const inlinesource = require('gulp-inline-source');
-
-const conf = require('../config');
+const glob = require('glob');
+const write = require('write');
+const through2 = require('through2');
+const minify = require('html-minifier').minify;
+const base = require('./base.js');
+const conf = require('../config/index.js');
+const dest = require('./dest.js');
 const utils = require('./utils.js');
+const storage = require('./storage.js');
 
-// 新增公用依赖包
-utils.publicDeps['flatten'] = flatten;
-utils.publicDeps['rev'] = rev;
-utils.publicDeps['revCollector'] = revCollector;
-utils.publicDeps['gulpif'] = gulpif;
-
-const gulp = utils.publicDeps.gulp;
-const plumber = utils.publicDeps.plumber;
-const through2 = utils.publicDeps.through2;
+let scriptExp = /<script[^>]*\bsrc\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*><\/script>/gi;
+let imgExp = /<img[^>|:]*\bsrc\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*>/gi;
+let linkExp = /<link[^>]*\bhref\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*>/gi;
 
 /**
- * 处理 HTML 文件中引入的资源
+ * 对指定的 html 进行扫描
+ * @param  {String} pattern - 指定路径的匹配规则
+ * @return {Promise}
  */
-function processResource(match, capture, dirname, type, inline) {
-	let basename = path.basename(capture);
+function scan(pattern) {
+	return new Promise((resolve, reject) => {
+		glob(pattern, (err, files) => {
+			if (err) {
+				reject({
+					title: `Scan ${pattern} failed.`,
+					message: new Error(err)
+				});
+				throw err;
+			}
 
-	// CDN 地址忽略
-	if (utils.detectNetwork(capture)) {
-		return match;
-	}
-	if (capture.indexOf('assets@') !== -1) {
-		utils.entry[type === 'js' ? 'uncompiledjs': type].push(
-			path.resolve(__dirname, capture.replace(/assets@/gi, '../src/assets/'))
-		);
-	} else {
-		utils.entry[type === 'js' ? 'compiledjs': type].push(
-			path.resolve(dirname, capture)
-		);
-	}
-  return match.replace(capture, `${type}/${basename}`).replace(/\>/, ` ${inline}>`);
+			let promises = []; // 存储所有的 promise
+			files.forEach(filepath => {
+				promises.push(
+					new Promise((resolvz, rejecz) => {
+						fs.createReadStream(filepath)
+							.pipe(through2.obj((file, enc, callback) => {
+								let content = file.toString('utf8');
+
+								// 处理 script/link/img 标签中的 url
+								content = processUrl(content, filepath);
+
+								if (process.env.NODE_ENV !== 'development') { // 非开发环境压缩处理
+									content = minify(content, base.html.minify);
+								}
+
+								// 写入构建目录
+								write(`${dest.html}${path.basename(filepath)}`, content, err => {
+									if (err) {
+										reject({
+											title: `Write ${filepath} file failed.`,
+											message: new Error(err)
+										});
+										throw err;
+									}
+									resolvz();
+								});
+								callback();
+							}));
+					})
+				);
+			});
+
+			Promise.all(promises).then(entry => {
+				resolve();
+			});
+		});
+	}).catch(err => {
+		utils.error(err);
+	});
 }
 
 /**
- * html 文件处理
- * 1.处理 @include 引入的模板
- * 2.处理 script、link、image 标签 url 前缀
- * 3.移除相对路径
+ * 处理 script/link/img 标签中的 url
+ * @param {String} content - html 文本内容
+ * @param {String} filepath - html 路径
  */
-module.exports.build = function() {
-	console.log('[CFT] Compiling html file.');
-	return gulp.src(utils.entry.html)
-		.pipe(plumber())
-		.pipe(through2.obj((file, enc, callback) => {
-			// buffer to string
-			let content = file.contents.toString(),
-				dirname = path.dirname(file.path);
+function processUrl(content, filepath) {
+	let env = process.env.NODE_ENV;
+	let prefix = conf[env].assetsPublicPath;
 
-			content = content
-				.replace(/<img[^(>|:)]*src=['"]([^'"]+)[^>]*>/gi, (match, capture) => {
-					// 1.扫描内容，收集 HTML 中使用的图片
-					return processResource(match, capture, dirname, 'img', '');
-				})
-				.replace(/<script[^>]*src=['"]([^'"]+)[^>]*><\/script>/gi, (match, capture) => {
-					// 2.扫描内容，收集 HTML 中使用 js，所有扫描的 js 均是入口文件
-					// 3.根据配置处理，是否使用内嵌 script
-					return processResource(match, capture, dirname, 'js', conf.inline.script ? 'inline' : '');
-				})
-				.replace(/<link[^>]*href=['"]([^'"]+)[^>]*>/gi, (match, capture) => {
-					// 4.扫描内容，收集 HTML 中使用 css，所有扫描的 css 均是入口文件
-					// 5.根据配置处理，是否使用内嵌 style
-					return processResource(match, capture, dirname, 'css', conf.inline.style ? 'inline' : '');
-				});
+	function getPaths(url, filepath) {
+		let paths = {
+			extname: path.extname(url)
+		};
+		paths.basename = path.basename(url, paths.extname);
+		paths.absolute = utils.absolute(filepath, url);
+		paths.alias = `${paths.basename}-${utils.createHash(paths.absolute)}${paths.extname}`;
+		
+		return paths;
+	}
 
-			// 重写为 buffer
-			file.contents = new Buffer(content, `utf-8`);
-			callback(null, file);
-		}))
+	content = content
+		// 处理 script 标签引入的 js 文件，http(s) 资源忽略
+		.replace(scriptExp, (match, capture) => {
+			let pzths = getPaths(capture, filepath);
+			let item = storage.addJs(pzths.absolute, pzths);
 
-		// 移除相对路径
-		.pipe(flatten())
-		.pipe(
-			gulpif(
-				utils.env !== 'development', 
-				gulpRemoveHtml(), // 清除特定标签
-				removeEmptyLines({removeComments: true}), // 清除空白行
-				htmlmin({
-					removeComments: true,// 清除HTML注释
-					collapseWhitespace: true,// 压缩HTML
-					collapseBooleanAttributes: true,// 省略布尔属性的值 <input checked="true"/> ==> <input />
-					removeEmptyAttributes: true,// 删除所有空格作属性值 <input id="" /> ==> <input />
-					removeScriptTypeAttributes: true,// 删除 <script> 的 type="text/javascript"
-					removeStyleLinkTypeAttributes: true,// 删除 <style> 和 <link> 的 type="text/css"
-					minifyJS: true,// 压缩页面JS
-					minifyCSS: true// 压缩页面CSS
-				})
-			)
-		)
-		.pipe(gulp.dest(utils.dest.html));
-};
+			return match.replace(capture, `${prefix}js/${item.alias}`);
+		})
+		// 处理 link 标签引入的 css 文件，http(s) 资源忽略
+		.replace(linkExp, (match, capture) => {
+			let pzths = getPaths(capture, filepath);
+			let item = storage.addCss(pzths.absolute, pzths);
+
+			return match.replace(capture, `${prefix}css/${item.alias}`);
+		})
+		// 处理 img 标签引入的 image 文件，http(s) 资源忽略
+		.replace(imgExp, (match, capture) => {
+			let pzths = getPaths(capture, filepath);
+			let item = storage.addImg(pzths.absolute, pzths);
+
+			return match.replace(capture, `${prefix}img/${item.alias}`);
+		});
+
+	return content;
+}
 
 /**
- * html 替换 css、js、图片 文件版本
+ * 构建图片
+ * @param {Array} htmlpath - html 路径
+ * @return {Promise}
  */
-module.exports.rev = function() {
-	return gulp.src([
-			utils.dest.rev + '*.json',
-			utils.dest.html + '*.html'
-		])
-		.pipe(plumber())
-		.pipe(revCollector())
-		.pipe(inlinesource())
-		// 处理 script、link、image 标签 url 前缀
-		.pipe(prefix(conf[utils.env].assetsPublicPath))
-		.pipe(gulp.dest(utils.dest.html));
+module.exports.build = function (htmlpath) {
+	return new Promise((resolve, reject) => {
+		let promises = [];
+		let entries = htmlpath.length ? htmlpath : conf.entry;
+
+		if (!entries.length) {
+			return resolve();
+		}
+
+		entries.forEach(pattern => {
+			promises.push(scan(`./src/views/${pattern}.html`));
+		});
+
+		Promise.all(promises).then(() => {
+			resolve();
+			utils.log('Finish compiling Html files.');
+		});
+	});
 };

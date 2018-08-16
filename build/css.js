@@ -1,46 +1,79 @@
+/**
+ * Compile css files
+ * @author pxy0809
+ * 1. 扫描所有的 url（背景/字体），存入 storage
+ * 2. 将已压缩 css 写入到指定的目录
+ */
+const fs = require('fs');
+const write = require('write');
+const dest = require('./dest.js');
 const utils = require('./utils.js');
 
-const gulp = utils.publicDeps.gulp;
-const plumber = utils.publicDeps.plumber;
-const flatten = utils.publicDeps.flatten; // 移除多余的路径
-const rev = utils.publicDeps.rev; // 添加版本号
-const revCollector = utils.publicDeps.revCollector;
+/**
+ * 扫描指定的 css 并使用 postcss 处理
+ * @param  {String} cssPath - css 文件路径
+ * @param  {String} alias   - css 文件别名
+ * @return {Promise}
+ */
+function scan(cssPath, alias) {
+	return new Promise((resolve, reject) => {
+		fs.readFile(cssPath, (err, content) => {
+			if (err) {
+				reject({
+					title: `Read ${cssPath} file failed.`,
+					message: new Error(err)
+				});
+				throw err;
+			}
+
+			utils.less(content.toString('utf8')).then(res => {
+				let paths = res.imports;
+				paths.unshift(cssPath);
+
+				let cssText = utils.urlInCss(res.css, paths, true);
+				cssText = utils.cleanCss(cssText);
+				write(`${dest.css}${alias}`, cssText, (err) => { // 写入 css 文件
+					if (err) {
+						reject({
+							title: `Write ${cssPath} to ${dest.css}${alias} file failed.`,
+							message: new Error(err)
+						});
+						throw err;
+					}
+					resolve();
+				});
+			})
+		});
+	}).catch(err => {
+		utils.error(err);
+	});
+};
 
 /**
- * less 文件处理
- * 1.编译 less
- * 2.生成 md5
- * 3.移除相对路径
- * 4.输出到指定目录
- * 5.生成 manifest.json 文件
+ * 编译 css
+ * @param {Object[]} cssList - css 文件信息列表
+ * @param {String} cssList[].extname - 后缀
+ * @param {String} cssList[].absolute - 绝对路径
+ * @param {String} cssList[].basename - 文件名
+ * @param {String} cssList[].alias - 文件别名，即文件名 + MD5(absolute)
+ * @return {Promise}
  */
-module.exports.build = function() {
-  console.log('[CFT] Compiling css file.');
-	return gulp.src(utils.entry.css)
-		.pipe(plumber())
-		.pipe(
-			require('gulp-postcss')([
-        // @import 查找路径
-        require('postcss-import')({
-          path: ['src/assets/css']
-        }),
-        // An async postcss plugin to copy all assets referenced in CSS files 
-        // to a custom destination folder and updating the URLs.
-        require('postcss-copy')({
-          basePath: ['src'],
-          dest: utils.dest.css,
-          template(fileMeta) {
-            return 'img/' + fileMeta.name + fileMeta.hash.substr(8) + '.' + fileMeta.ext;
-          }
-        }),
-        require('precss')(),
-        require('autoprefixer')(),
-        require('postcss-csso')()
-			])
-		)
-		.pipe(rev())
-		.pipe(flatten())
-		.pipe(gulp.dest(utils.dest.css))
-		.pipe(rev.manifest('rev-css-manifest.json'))
-    .pipe(gulp.dest(utils.dest.rev));
+module.exports.build = function(cssList) {
+	return new Promise((resolve, reject) => {
+		let promises = [];
+		let keys = Object.keys(cssList);
+
+		if (!keys.length) {
+			return resolve();
+		}
+
+		keys.forEach(cssPath => {
+			promises.push(scan(cssPath, cssList[cssPath].alias));
+		});
+
+		Promise.all(promises).then(reslists => {
+			resolve();
+			utils.log('Finish compiling css files.');
+		})
+	});
 };

@@ -1,11 +1,11 @@
-const gulp = require('gulp');
 const browserSync = require('browser-sync').create(); // browsersync
 const proxyMiddleware = require('http-proxy-middleware'); // proxy
 const conf = require('../config');
-const dev = conf.development;
+const dest = require('./dest.js');
+const devConfig = conf[process.env.NODE_ENV];
 
 module.exports.create = function() {
-	let proxyTable = dev.proxyTable,
+	let proxyTable = devConfig.proxyTable,
 		proxys = [];
 
 	// proxy api requests
@@ -21,12 +21,12 @@ module.exports.create = function() {
 
 	browserSync.init({
 		server: {
-	    baseDir: `../dist/${conf.version}/`,
+	    baseDir: dest.base,
 	    middleware: proxys
 	  },
-	  host: dev.host,
-	  port: dev.port,
-	  open: dev.open,
+	  host: devConfig.host,
+	  port: devConfig.port,
+	  open: devConfig.open,
 	  logLevel: 'silent',
 	  notify: false, // 不显示在浏览器中的任何通知
 	  snippetOptions: {
@@ -48,6 +48,6 @@ module.exports.create = function() {
 			}
 		}
 	});
-	console.log(`[^_^] Server: listening on port ${dev.port}, Accessing in: http://${dev.host}:${dev.port}`);
+	console.log(`[^_^] Server: listening on port ${devConfig.port}, Accessing in: http://${devConfig.host}:${devConfig.port}`);
 };
 module.exports.browserSync = browserSync;

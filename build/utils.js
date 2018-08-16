@@ -1,130 +1,150 @@
-
 /**
- * 处理 html/less/js 入口
- * 默认约定：
- * 	1.模块中的 html、less、js 入口文件命名与模块名严格保持一致
- * 根据配置 modules 中的模块名，匹配对应的 html 入口，确定 js 和 less 的入口
- * xx: 匹配 xx.html
- * xx/*: 匹配 xx/*.html
- * xx/**\/*: 匹配 xx 文件下的所有包含子文件夹中的 html 
+ * 工具函数
+ * @author pxy0809
  */
-const gulp = require('gulp');
+const crypto = require('crypto');
+const fs = require('fs-extra');
 const path = require('path');
-const plumber = require('gulp-plumber');
-const del = require('del');
-const zip = require('gulp-zip');
-const through2 = require('through2');
-const conf = require('../config');
-const pkg = require('../package.json');
+const glob = require('glob');
+const chalk = require('chalk');
+const less = require('less');
+const CleanCSS = require('clean-css');
+const base = require('./base.js');
+const conf = require('../config/index.js');
+const storage = require('./storage.js');
 
-let destBasePath = `../dist/${conf.version ? conf.version + '/' : ''}`;
-let entry = {
-	html: [],
-	css: [],
-	img: [],
-	compiledjs: [],
-	uncompiledjs: []
+/**
+ * 生成 MD5 hash
+ */
+module.exports.createHash = input => {
+	return crypto.createHash('md5').update(input).digest('hex').slice(0, 10);
 };
-let dest = {
-	base: destBasePath,
-	html: destBasePath,
-	css: `${destBasePath}css/`,
-	img: `${destBasePath}img/`,
-	js: `${destBasePath}js/`,
-	rev: `${destBasePath}dev/`
+
+/**
+ * 计算绝对路径
+ * @param {String} curUrl - 当前的 url
+ * @param {String} preUrl - 待计算 url
+ */
+module.exports.absolute = (curUrl, preUrl) => {
+	return path.resolve(__dirname, '../', path.dirname(curUrl), preUrl);
 };
-let env = process.env.NODE_ENV.trim();
 
 /**
- * 清理上次构建文件
- * 所有任务的开始
+ * 输出错误信息
+ * @param {String|Object} title - 错误信息的标题
+ * @param {String|Undefined} message - 错误信息的内容
  */
-module.exports.clean = function clean() {
-	return del.sync([
-		destBasePath + '**' // 清除当前版本下的文件
-	], {
-		force: true // Allow deleting the current working directory and outside.
+module.exports.error = function error(title, message) {
+	let info = typeof title === 'object' ? title : {title, message};
+	console.error(`${chalk.red(info.title)}\n`, info.message);
+};
+
+/**
+ * 输出常规信息
+ * @param {String} msg - 待输出的信息
+ */
+module.exports.log = function log(msg) {
+	console.info(`${chalk.green('[Groll]')} ${msg}`);
+};
+
+/**
+ * 创建文件夹
+ * @param {String} dest - 目标地址
+ * @param {Function} cb - 回调函数
+ */
+module.exports.mkdir = function mkdir(dest, cb) {
+	let dir = path.resolve(process.cwd(), dest);
+	let extname = path.extname(dir);
+
+	if (extname) {
+		dir = path.dirname(dir);
+	}
+	fs.mkdir(dir, err => {
+		if (err && err.code !== 'EEXIST') {
+			return cb(dir, new Error(err));
+		}
+		cb(dir);
 	});
-}
+};
 
 /**
- * 构建入口
+ * 使用 postcss 处理 css 文件
+ * @param {String} cssText - css 文本
+ * @param {Object} options - 选项配置
+ * @return {Promise}
  */
-module.exports.getEntryTask = function() {
-	let htmlEntry = conf.entry.map((val) => {
-		return `../src/views/${val}.html`;
-	});
-
-	return gulp.src(htmlEntry)
-		.pipe(plumber())
-		.pipe(through2.obj((file, enc, callback) => {
-			let filename = path.basename(file.path, '.html');
-			entry.html.push(file.path);
-			callback();
-		}));
-}
+module.exports.less = function (cssText, opts) {
+	return less.render(cssText, opts || {});
+};
 
 /**
- * 判断是否网络资源
- * http/https
+ * 压缩 css
  */
-module.exports.detectNetwork = function(url) {
-	return /^(https|http):\/\/?/.test(url);
-}
+module.exports.cleanCss = function(input, options) {
+	return new CleanCSS(options || {}).minify(input).styles;
+};
+
 
 /**
- * 根据路径获取相关信息
+ * 提取 css 中的图片和字体
+ * @param {String} cssText - css 文本
+ * @param {Array} paths - 当前 css 依赖的 css 文件
+ * @param {Boolean} islink - 是否通过 link 标签引入
+ * @return {String}
  */
-module.exports.getInfoFromPath = function(filepath) {
-	let basename = path.basename(filepath),
-		dirname = path.dirname(filepath),
-		extname = path.extname(filepath);
+module.exports.urlInCss = function (cssText, paths, islink) {
+	// 匹配非 http(s) 和 data: 资源
+	let urlexp = /\burl\b\s*\(\s*['"]?((?!.*?(http(s?))|(data):)+[^\)'"]*)['"]?\s*\)/gi;
+	let prefix = islink ? '../' : './';
 
-	return {
-		basename: basename,
-		dirname: dirname,
-		extname: extname,
-		filename: basename.replace(extname, '')
+	// 获取当前扫描图片或者字体真实路径
+	// 图片或者字体可能在当前 css 中，可能在依赖的 css 中
+	let absUrl = (url, paths) => {
+		let absolute;
+		for (let i = 0, l = paths.length; i < l; i++) {
+			absolute = path.resolve(path.dirname(paths[i]), url);
+			if (fs.pathExistsSync(absolute)) {
+				return absolute;
+			}
+		}
+		return '';
 	};
-}
 
-/**
- * zip
- */
-module.exports.zipTask = function() {
-	if (conf[env].zip) {
-		return gulp.src(destBasePath + '*')
-		.pipe(zip(`${pkg.name}${conf.version}.zip`))
-		.pipe(gulp.dest(destBasePath));
-	}
-	return null;
+	cssText = cssText.replace(urlexp, (match, capture) => {
+		// 移除url中的查询条件 url('iconfont.eot?t=1534151265299');
+		let urls = capture.split('?');
+		let pzth = {};
+		let item;
+		
+		pzth.extname = path.extname(urls[0]);
+		pzth.absolute = absUrl(urls[0], paths);
+		pzth.basename = path.basename(urls[0], pzth.extname);
+		pzth.alias = `${pzth.basename}-${module.exports.createHash(pzth.absolute)}${pzth.extname}`;
+
+		if (['.png', '.jpg', 'jpeg', '.gif'].indexOf(pzth.extname) !== -1) {
+			item = storage.addImg(pzth.absolute, pzth);
+			return match.replace(capture, `${prefix}img/${item.alias}`);
+		} else {
+			item = storage.addFont(pzth.absolute, pzth);
+			urls[1] = urls[1] ? '?' + urls[1] : '';
+			return match.replace(capture, `${prefix}font/${item.alias}${urls[1]}`);
+		}
+	});
+	return cssText;
 };
 
 /**
- * ftp
+ * 处理 js 中图片路径
  */
-module.exports.ftpTask = function() {
-	let ftpconf = conf[env].ftp;
+module.exports.collectImgInJs = function(imgs) {
+	imgs = Array.isArray(imgs) ? imgs : [imgs];
+	imgs.forEach(item => {
+		let paths = {};
+		paths.extname = path.extname(item.path);
+		paths.absolute = path.resolve(process.cwd(), item.path);
+		paths.basename = path.basename(item.path);
+		paths.alias = item.alias;
 
-	if (ftpconf.enabled) {
-		var conn = require('vinyl-ftp').create(Object.assgin({}, ftpconf));
-		return gulp.src(destBasePath + '**', {base: '.', buffer: false})
-			.pipe(conn.dest(`/${pkg.name}`))
-	}
-	return null;
+		storage.addImg(paths.absolute, paths);
+	});
 };
-
-module.exports.entry = entry;
-module.exports.dest = dest;
-module.exports.env = env;
-
-/**
- * 公用依赖包
- * 将公用依赖包存储，防止二次加载
- */
-module.exports.publicDeps = {
-	gulp: gulp,
-	plumber: plumber,
-	through2: through2
-};
-console.log('[CFT] Compiling...');

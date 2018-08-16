@@ -6,21 +6,13 @@
  */
 module.exports = {
 	version: '1.0.0',
-	entry: ['index'],
+	entry: ['group-booking/index'],
 	inline: { // 控制css/js以style和script标签形式存在
 		style: true,
 		script: false
 	},
-	rollup: {
-		external: ['vue', 'axios'], // 第三方，忽略打包
-		globals: { // 全局变量
-      vue: 'Vue',
-      axios: 'axios'
-    }
-	},
-
 	// 开发环境
-	development: { 
+	development: {
 		assetsPublicPath: './',
 		useEslint: false,
 		host: 'localhost',
@@ -34,26 +26,28 @@ module.exports = {
 	        '^/api': ''
 	      }
 	    }
-	  }
+	  },
+	  contextpath: 'http://www.fiy.com'
 	},
 
 	// 单元测试环境
-	unit: { 
+	unit: {
 
 	},
 
 	// 测试环境
-	test: { 
-		assetsPublicPath: './',
+	test: {
+		assetsPublicPath: 'http://fiy.test.com/',
 		proxyTable: {
 			'/api': {
-	      target: 'http://test.fiy.com',
+	      target: 'http://fiy.test.com',
 	      changeOrigin: true,
 	      pathRewrite: {
 	        '^/api': ''
 	      }
 	    }
 	  },
+	  contextpath: 'http://www.fiy.com',
 	  zip: false,
 	  ftp: {
 			enabled: false, // 启用？默认不启用
@@ -66,17 +60,18 @@ module.exports = {
 	},
 
 	// 生产环境
-	production: { 
-		assetsPublicPath: './',
+	production: {
+		assetsPublicPath: 'http://fiy.prod.com/',
 		proxyTable: {
 			'/api': {
-	      target: 'http://test.fiy.com',
+	      target: 'http://fiy.prod.com',
 	      changeOrigin: true,
 	      pathRewrite: {
 	        '^/api': ''
 	      }
 	    }
 	  },
+	  contextpath: 'http://www.fiy.com',
 	  zip: true,
 	  ftp: {
 			enabled: false, // 启用？默认不启用
