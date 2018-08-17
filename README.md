@@ -411,21 +411,3 @@ export default Vue.component('hello-groll', {
 
 1. 在 `config/index.js` 文件的相关环境选项配置数据。
 2. 通过命令行 `--config` 指定配置文件，例如： `npm run dev -- index --config src/views/config.js`，如果没有指定，则使用默认的配置（`config/index.js`）。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-=======
-- `gulpfile.js` Gulp 配置文件，构建编译的入口文件。
->>>>>>> 9e54bf99a33a4dbedbee651f780f9e22787d7beb
