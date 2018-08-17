@@ -294,6 +294,7 @@ src
 - `.babelrc` Babel转换器配置文件，能让我们可以在项目中使用ES6/7来编写代码。
 - `.eslintrc` ES6校验配置文件，Lint功能可以帮你保持代码风格的统一。
 - `package.json` npm配置文件，其中列出了项目使用到的第三方依赖包。 你还可以在这里添加自己的自定义脚本。
+<<<<<<< HEAD
 
 ## Demo
 
@@ -425,3 +426,6 @@ export default Vue.component('hello-groll', {
 
 
 
+=======
+- `gulpfile.js` Gulp 配置文件，构建编译的入口文件。
+>>>>>>> 9e54bf99a33a4dbedbee651f780f9e22787d7beb
