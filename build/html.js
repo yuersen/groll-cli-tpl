@@ -12,11 +12,11 @@ const write = require('write');
 const through2 = require('through2');
 const minify = require('html-minifier').minify;
 const base = require('./base.js');
-const conf = require('../config/index.js');
 const dest = require('./dest.js');
 const utils = require('./utils.js');
 const storage = require('./storage.js');
 
+let conf = storage.getConfig();
 let scriptExp = /<script[^>]*\bsrc\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*><\/script>/gi;
 let imgExp = /<img[^>|:]*\bsrc\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*>/gi;
 let linkExp = /<link[^>]*\bhref\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*>/gi;

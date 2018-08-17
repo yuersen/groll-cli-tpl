@@ -2,7 +2,8 @@
  * 构建目录信息
  * @author pxy0809
  */
-const conf = require('../config/index.js');
+const storage = require('./storage.js');
+const conf = storage.getConfig();
 let basePath = `./dist/${conf.version ? conf.version + '/' : ''}`;
 
 module.exports = {

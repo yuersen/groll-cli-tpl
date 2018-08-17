@@ -18,7 +18,8 @@ const {CLIEngine} = require('eslint');
 const base = require('./base.js');
 const dest = require('./dest.js');
 const utils = require('./utils.js');
-const conf = require('../config/index.js');
+const storage = require('./storage.js');
+let conf = storage.getConfig();
 
 /**
  * 处理 import 'xx.html' 或者 import 'xx.tpl'

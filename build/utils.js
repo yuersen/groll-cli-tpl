@@ -5,12 +5,9 @@
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
-const glob = require('glob');
 const chalk = require('chalk');
 const less = require('less');
 const CleanCSS = require('clean-css');
-const base = require('./base.js');
-const conf = require('../config/index.js');
 const storage = require('./storage.js');
 
 /**

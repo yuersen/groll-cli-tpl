@@ -1,14 +1,17 @@
 const browserSync = require('browser-sync').create(); // browsersync
 const proxyMiddleware = require('http-proxy-middleware'); // proxy
-const conf = require('../config');
 const dest = require('./dest.js');
-const devConfig = conf[process.env.NODE_ENV];
+const storage = require('./storage.js');
+
+let conf = storage.getConfig();
+let devConfig = conf[process.env.NODE_ENV];
 
 module.exports.create = function() {
 	let proxyTable = devConfig.proxyTable,
 		proxys = [];
 
 	// proxy api requests
+	// 根据配置分别创建多个代理设置
 	Object.keys(proxyTable).forEach(context => {
 	  let options = proxyTable[context];
 	  if (typeof options === 'string') {

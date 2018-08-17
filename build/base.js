@@ -12,22 +12,7 @@ module.exports = {
 		}
 	},
 	css: { // css 编译选项
-		postcss: {
-			'postcss-import': {
-	      path: ['src/assets/css', 'src/views', 'node_modules']
-	    },
-	    'postcss-extend': null,
-	    'precss': null,
-	    'postcss-define-function': {
-	    	// Remove unknown callFns and do not throw a error. Default is false.
-	    	silent: false
-	    },
-	    'autoprefixer': null,
-	    'postcss-csso': {
-				comments: false,
-				forceMediaMerge: false
-			}
-		}
+		
 	},
 	rollup: { // js 编译选项
 		input: {

@@ -6,11 +6,8 @@
  */
 module.exports = {
 	version: '1.0.0',
-	entry: ['group-booking/index'],
-	inline: { // 控制css/js以style和script标签形式存在
-		style: true,
-		script: false
-	},
+	entry: ['index'],
+
 	// 开发环境
 	development: {
 		assetsPublicPath: './',
@@ -19,15 +16,23 @@ module.exports = {
 		port: 8090,
 		open: true, // 服务器启动时自动打开的网址
 		proxyTable: {
-			'/api': {
+			'/test': {
 	      target: 'http://test.fiy.com',
 	      changeOrigin: true,
 	      pathRewrite: {
-	        '^/api': ''
+	        '^/test': ''
 	      }
+	    },
+	    '/apptest': { // 报告接口代理
+	    	target: 'http://apptest.zhixue.com',
+				changeOrigin: true,
+				pathRewrite: {
+				  '^/apptest': ''
+				}
 	    }
-	  },
-	  contextpath: 'http://www.fiy.com'
+		},
+		TEST_BASE_URL: '/test',
+		APPTEST_BASE_URL: '/apptest'
 	},
 
 	// 单元测试环境
@@ -37,26 +42,18 @@ module.exports = {
 
 	// 测试环境
 	test: {
-		assetsPublicPath: 'http://fiy.test.com/',
+		assetsPublicPath: 'http://fiy.test.com/', //资源部署服务器地址
 		proxyTable: {
 			'/api': {
-	      target: 'http://fiy.test.com',
+	      target: 'http://fiy.test.com',   // 若使用node部署，这是node 代理地址
 	      changeOrigin: true,
 	      pathRewrite: {
 	        '^/api': ''
 	      }
 	    }
 	  },
-	  contextpath: 'http://www.fiy.com',
-	  zip: false,
-	  ftp: {
-			enabled: false, // 启用？默认不启用
-			host: '',
-			post: '',
-			user: 'admin',
-			password: 'admin',
-			parallel: 3 // 并行传输数，默认为 3
-		}
+		TEST_BASE_URL: 'http://test.fiy.com',
+		APPTEST_BASE_URL: 'http://apptest.fiy.com'
 	},
 
 	// 生产环境
@@ -71,15 +68,7 @@ module.exports = {
 	      }
 	    }
 	  },
-	  contextpath: 'http://www.fiy.com',
-	  zip: true,
-	  ftp: {
-			enabled: false, // 启用？默认不启用
-			host: '',
-			post: '',
-			user: 'admin',
-			password: 'admin',
-			parallel: 3 // 并行传输数，默认为 3
-		}
+		TEST_BASE_URL: 'http://www.fiy.com',
+		APPTEST_BASE_URL: 'http://app.fiy.com'
 	}
 };
