@@ -12,9 +12,15 @@ module.exports = {
 		}
 	},
 	css: { // css 编译选项
-		
+
 	},
 	rollup: { // js 编译选项
+		sign: { // 标记
+			entry: 'data-entry' // 入口文件标记，默认在 script 标签中有 data-entry 标记的文件，是 js 入口文件
+		},
+		external: { // 通过 script 引入的非模块化的 js 文件
+			bundle: true // 是否合并到单文件
+		},
 		input: {
 			external: ['vue', 'axios'] // 第三方，忽略打包
 		},
@@ -34,6 +40,7 @@ module.exports = {
 		 * js 中使用图片白名单
 		 * 原因：路径需要动态计算，编译阶段不可预知，需要通过白名单指定相关图片
   	 */
-		white: []
+		white: [
+		]
 	}
 };

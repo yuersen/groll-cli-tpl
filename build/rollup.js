@@ -4,6 +4,8 @@
  * 2. manifest 化处理
  * 3. 压缩
  */
+const fs = require('fs');
+const write = require('write');
 const path = require('path');
 const rollup = require('rollup');
 const {createFilter, dataToEsm} = require('rollup-pluginutils');
@@ -90,7 +92,11 @@ function imgInJs(options) {
 		transform(code, id) {
 			if (filter(id)) {
 				code.replace(/\/\/\s*<\s*#\s*(\{[^\}]*\})\s*#\s*>/gi, (match, capture) => {
-					utils.collectImgInJs(eval('(' + capture + ')'));
+					try {
+						utils.collectImgInJs(eval('(' + capture + ')'));
+					} catch(err) {
+						utils.error('Parse json failed.', new Error(capture + ' is not a json string.'));
+					}
 					return match;
 				});
 			}
@@ -203,11 +209,12 @@ function importJson(options) {
 /**
  * 处理 js 文件
  */
-function scan(jsPath, alias) {
+function scan(jsinfo) {
 	return new Promise((resolve, reject) => {
+		let promises = [];
 		let config = conf[process.env.NODE_ENV];
 		let inputOptions = Object.assign({}, base.rollup.input, {
-			input: jsPath,
+			input: jsinfo.entry.absolute,
 			plugins: [
 				imgInJs({
 					include: ['src/**/*.js'],
@@ -250,14 +257,55 @@ function scan(jsPath, alias) {
 			]
 		});
 		let outputOptions = Object.assign({}, base.rollup.output, {
-			file: `${dest.js}${alias}`
+			file: `${dest.js}${jsinfo.entry.alias}`
 		});
 
-		rollup.rollup(inputOptions).then(bundle => {
-			bundle.write(outputOptions);
+		promises.push(
+			rollup.rollup(inputOptions).then(bundle => {
+				bundle.write(outputOptions);
+				// resolve();
+			}).catch(err => {
+				utils.error('Rollup running error reporting', err);
+			})
+		);
+
+		// 合并外部引入的非http(s) js 文件
+		let external = [];
+		if (jsinfo.external.list.length) {
+			jsinfo.external.list.forEach(item => {
+				external.push(new Promise((resolvz, rejecz) => {
+					fs.readFile(item.absolute, (err, content) => {
+						if (err) {
+							rejecz({
+								title: `Concat ${item.absolute} file failed.`,
+								message: new Error(err)
+							});
+							throw err;
+						}
+						
+						resolvz(content.toString('utf8'));
+					});
+				}));
+			});
+			promises.push(
+				Promise.all(external).then(res => {
+					// 写入 bundle.js 文件
+					write(`${dest.js}${jsinfo.external.alias}`, UglifyJS.minify(res.join(';'), base.rollup.minify).code, (err) => { 
+						if (err) {
+							reject({
+								title: `Write ${jsinfo.external.alias} file failed.`,
+								message: new Error(err)
+							});
+							throw err;
+						}
+						resolve();
+					});
+				})
+			);
+		}
+
+		Promise.all(promises).then(() => {
 			resolve();
-		}).catch(err => {
-			utils.error('Rollup running error reporting', err);
 		});
 	});
 }
@@ -280,8 +328,16 @@ module.exports.build = function (jsList) {
 			return resolve();
 		}
 		
-		keys.forEach(jsPath => {
-			promises.push(scan(jsPath, jsList[jsPath].alias));
+		keys.forEach(item => {
+			let jsinfo = jsList[item];
+
+			if (!jsinfo.entry.absolute) {
+				let err =  new Error('Please use the sign of entry in base.js to ' + item);
+				utils.error('No entry file specified.', err);
+				throw err;
+			}
+
+			promises.push(scan(jsinfo));
 		});
 		Promise.all(promises).then(reslists => {
 			resolve();

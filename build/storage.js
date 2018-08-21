@@ -19,17 +19,49 @@ module.exports.getImg = function() {
 };
 
 // 存储所有的 js 文件信息
+/**
+ * 'path/to/html': {
+ * 	entry: 'path/to/entry',
+ * 	alias: '',
+ * 	external: {
+ * 		bundle: true/false,
+ * 		content: ['path/to/1.js'],
+ * 		alias: 'alias/js'
+ * 	}
+ * }
+h */
 let js = {};
-
-module.exports.addJs = function(pzth, value) {
-	if (pzth in js) {
-		return js[pzth];
+let baseJsInfo = {
+	entry: {
+		alias: '',
+		basename: '',
+		extname: '',
+		absolute: '',
+	},
+	external: {
+		list: [],
+		alias: ''
 	}
-	js[pzth] = value;
-	return value;
+};
+module.exports.addJs = function(htmlpath, val) {
+	if (!js[htmlpath]) {
+		js[htmlpath] = Object.assign({}, baseJsInfo, val || {});
+	}
+	return js[htmlpath];
 };
 module.exports.getJs = function() {
 	return js;
+};
+module.exports.addEntry = function(htmlpath, jsinfo) {
+	let item = module.exports.addJs(htmlpath);
+	item.entry = jsinfo;
+	item.external.alias = `bundle-${jsinfo.hash}.js`;
+	return jsinfo;
+};
+module.exports.addExternal = function(htmlpath, jspath) {
+	let item = module.exports.addJs(htmlpath);
+	item.external.list.push(jspath);
+	return item.external;
 };
 
 // 存储所有的 css 文件信息

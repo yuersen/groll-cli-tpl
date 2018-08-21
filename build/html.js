@@ -18,7 +18,7 @@ const storage = require('./storage.js');
 
 let conf = storage.getConfig();
 let scriptExp = /<script[^>]*\bsrc\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*><\/script>/gi;
-let imgExp = /<img[^>|:]*\bsrc\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*>/gi;
+let imgExp = /<img[^>|:]*\bsrc\b\s*=\s*['"]((?!.*?(http(s?)|data):)+([^'"]*))['"][^>]*>/gi;
 let linkExp = /<link[^>]*\bhref\b\s*=\s*['"]((?!.*?http(s?):)+([^'"]*))['"][^>]*>/gi;
 
 /**
@@ -44,6 +44,9 @@ function scan(pattern) {
 						fs.createReadStream(filepath)
 							.pipe(through2.obj((file, enc, callback) => {
 								let content = file.toString('utf8');
+
+								// 移除注释内容，排除注释内容可能包含 url
+								content = content.replace(/<!--[\w\W\r\n]*?-->/gmi, '');
 
 								// 处理 script/link/img 标签中的 url
 								content = processUrl(content, filepath);
@@ -86,41 +89,58 @@ function scan(pattern) {
 function processUrl(content, filepath) {
 	let env = process.env.NODE_ENV;
 	let prefix = conf[env].assetsPublicPath;
+	let removeExternalScriptTag = -1;
 
 	function getPaths(url, filepath) {
-		let paths = {
-			extname: path.extname(url)
-		};
+		let paths = {};
+		paths.extname = path.extname(url);
 		paths.basename = path.basename(url, paths.extname);
 		paths.absolute = utils.absolute(filepath, url);
-		paths.alias = `${paths.basename}-${utils.createHash(paths.absolute)}${paths.extname}`;
-		
+		paths.hash = utils.createHash(filepath);
+		paths.alias = `${paths.basename}-${paths.hash}${paths.extname}`;
 		return paths;
 	}
 
 	content = content
 		// 处理 script 标签引入的 js 文件，http(s) 资源忽略
 		.replace(scriptExp, (match, capture) => {
-			let pzths = getPaths(capture, filepath);
-			let item = storage.addJs(pzths.absolute, pzths);
+			let isEntry = match.indexOf(base.rollup.sign.entry) !== -1;
+			let paths = getPaths(capture, filepath);
 
-			return match.replace(capture, `${prefix}js/${item.alias}`);
+			if (!paths.extname) { // 空 url 不处理
+				return match;
+			}
+			
+			if (isEntry) { // entry js file
+				storage.addEntry(filepath, paths);
+			} else {
+				storage.addExternal(filepath, paths);
+				removeExternalScriptTag += 1;
+			}
+			return !isEntry && removeExternalScriptTag >= 1 ? '' : match.replace(capture,  `${prefix}js/${paths.alias}`);
 		})
 		// 处理 link 标签引入的 css 文件，http(s) 资源忽略
 		.replace(linkExp, (match, capture) => {
-			let pzths = getPaths(capture, filepath);
-			let item = storage.addCss(pzths.absolute, pzths);
+			let paths = getPaths(capture, filepath);
+			
+			if (!paths.extname) { // 空 url 不处理
+				return match;
+			}
 
+			let item = storage.addCss(paths.absolute, paths);
 			return match.replace(capture, `${prefix}css/${item.alias}`);
 		})
 		// 处理 img 标签引入的 image 文件，http(s) 资源忽略
 		.replace(imgExp, (match, capture) => {
-			let pzths = getPaths(capture, filepath);
-			let item = storage.addImg(pzths.absolute, pzths);
+			let paths = getPaths(capture, filepath);
 
+			if (!paths.extname) { // 空 url 不处理
+				return match;
+			}
+
+			let item = storage.addImg(paths.absolute, paths);
 			return match.replace(capture, `${prefix}img/${item.alias}`);
 		});
-
 	return content;
 }
 

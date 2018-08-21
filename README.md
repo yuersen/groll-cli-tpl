@@ -411,3 +411,9 @@ export default Vue.component('hello-groll', {
 
 1. 在 `config/index.js` 文件的相关环境选项配置数据。
 2. 通过命令行 `--config` 指定配置文件，例如： `npm run dev -- index --config src/views/config.js`，如果没有指定，则使用默认的配置（`config/index.js`）。
+
+## 更新历史
+
+- 2018/08/21
+	- 扫描html 文件忽略 img 标签值为 `data:xxx`。
+	- 支持通过 `script` 标签引入本地资源，编译阶段合并压缩，输出 `bundle-md5-hash.js`。
