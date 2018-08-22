@@ -31,6 +31,7 @@ module.exports.create = function() {
 	  port: devConfig.port,
 	  open: devConfig.open,
 	  logLevel: 'silent',
+		reloadOnRestart: true, // 不自动重装下一个Browsersync重装所有的浏览器
 	  notify: false, // 不显示在浏览器中的任何通知
 	  snippetOptions: {
 			//提供一个自定义的正则表达式插入片段。

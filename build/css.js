@@ -31,7 +31,6 @@ function scan(cssPath, alias) {
 				paths.unshift(cssPath);
 
 				let cssText = utils.urlInCss(res.css, paths, true);
-				cssText = utils.cleanCss(cssText);
 				write(`${dest.css}${alias}`, cssText, (err) => { // 写入 css 文件
 					if (err) {
 						reject({

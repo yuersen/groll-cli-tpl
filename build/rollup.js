@@ -61,9 +61,8 @@ function cssInJs(options) {
 					paths.unshift(id);
 
 					let cssText = utils.urlInCss(res.css, paths, false);
-					let cleanText = utils.cleanCss(cssText);
 					let output = `
-            \nvar css = ${JSON.stringify(cleanText)};
+            \nvar css = ${JSON.stringify(cssText)};
             \export default 'css';
             \nimport styleInject from 'style-inject';
             \nstyleInject(css);

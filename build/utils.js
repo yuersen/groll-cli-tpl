@@ -8,6 +8,8 @@ const path = require('path');
 const chalk = require('chalk');
 const less = require('less');
 const CleanCSS = require('clean-css');
+const autoprefixer = require('autoprefixer');
+const postcss = require('postcss');
 const storage = require('./storage.js');
 
 /**
@@ -71,7 +73,24 @@ module.exports.mkdir = function mkdir(dest, cb) {
  * @return {Promise}
  */
 module.exports.less = function (cssText, opts) {
-	return less.render(cssText, opts || {});
+	return new Promise((resolve, reject) => {
+		less.render(cssText, opts || {}).then(result => {
+			// from 和 to 属性，因不输出具体的 css 文件，可忽略
+			postcss([autoprefixer({
+				browsers: ["> 1%", "iOS 7", "Android >= 3.2"]
+			})])
+				.process(result.css, {
+					from: 'dist/test.css',
+					to: 'dist/test.css'
+				})
+				.then(res => {
+					resolve({
+						imports: result.imports,
+						css: module.exports.cleanCss(res.css)
+					});
+				});
+		})
+	});
 };
 
 /**

@@ -45,8 +45,8 @@ del(pkg.dest.base, {force: true}).then(() => {
 			chokidar.watch([
 				'./src/**/*.html',
 				'./src/**/*.js',
-				'./src/**/*.less',
-				'./src/**/*.css'
+				'./src/**/*.css',
+				'./src/**/*.less'
 			]).on('change', (path, stats) => {
 				build(() => {
 					pkg.server.browserSync.reload();
