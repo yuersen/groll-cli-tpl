@@ -45,6 +45,7 @@ del(pkg.dest.base, {force: true}).then(() => {
 			chokidar.watch([
 				'./src/**/*.html',
 				'./src/**/*.js',
+				'./src/**/*.less',
 				'./src/**/*.css'
 			]).on('change', (path, stats) => {
 				build(() => {

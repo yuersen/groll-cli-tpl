@@ -417,3 +417,5 @@ export default Vue.component('hello-groll', {
 - 2018/08/21
 	- 扫描html 文件忽略 img 标签值为 `data:xxx`。
 	- 支持通过 `script` 标签引入本地资源，编译阶段合并压缩，输出 `bundle-md5-hash.js`。
+- 2018/08/22
+	- 对 src 目录下的 less 文件进行监听，并在改变后调用浏览器自动刷新
