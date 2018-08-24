@@ -1,5 +1,6 @@
 /**
  * 对 js 文件进行处理
+ * @author pxy0809
  * 1. 扫描所有的 url（背景/字体），供图片打包处理使用
  * 2. manifest 化处理
  * 3. 压缩
@@ -111,8 +112,7 @@ function uglifyJs() {
 	return { // 压缩 js 代码
   	name: 'uglifyJs',
 	 	transformBundle(code) {
-	 		return process.env.NODE_ENV !== 'development'
-	 			? UglifyJS.minify(code, base.rollup.minify) : code;
+	 		return UglifyJS.minify(code, base.rollup.minify);
 	 	}
 	};
 }
@@ -252,11 +252,12 @@ function scan(jsinfo) {
 					include: 'src/**/*.js',
 					exclude: ['node_modules/**']
 				}, conf.development.useEslint),
-				uglifyJs()
+				(process.env.NODE_ENV !== 'development' && uglifyJs())
 			]
 		});
 		let outputOptions = Object.assign({}, base.rollup.output, {
-			file: `${dest.js}${jsinfo.entry.alias}`
+			file: `${dest.js}${jsinfo.entry.alias}`,
+			sourcemap: process.env.NODE_ENV === 'development' // 只在开发环境生成 sourcemap
 		});
 
 		promises.push(

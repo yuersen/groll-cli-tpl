@@ -66,8 +66,8 @@ module.exports.build = function(cssList) {
 			return resolve();
 		}
 
-		keys.forEach(cssPath => {
-			promises.push(scan(cssPath, cssList[cssPath].alias));
+		keys.forEach(csspath => {
+			promises.push(scan(csspath, cssList[csspath].alias));
 		});
 
 		Promise.all(promises).then(reslists => {

@@ -16,7 +16,7 @@ const storage = require('./storage.js');
  * 生成 MD5 hash
  */
 module.exports.createHash = input => {
-	return crypto.createHash('md5').update(input).digest('hex').slice(0, 10);
+	return crypto.createHash('md5').update(input + Date.now()).digest('hex').slice(0, 10);
 };
 
 /**
