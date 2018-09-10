@@ -1,6 +1,5 @@
 /**
  * 对 js 文件进行处理
- * @author pxy0809
  * 1. 扫描所有的 url（背景/字体），供图片打包处理使用
  * 2. manifest 化处理
  * 3. 压缩
@@ -19,9 +18,10 @@ const UglifyJS = require('uglify-js');
 const {minify} = require('html-minifier');
 const {CLIEngine} = require('eslint');
 const base = require('./base.js');
-const dest = require('./dest.js');
+const dest = require('./dest.js').paths();
 const utils = require('./utils.js');
 const storage = require('./storage.js');
+const hooks = require('./hook.js');
 let conf = storage.getConfig();
 
 /**
@@ -83,6 +83,7 @@ function cssInJs(options) {
 /**
  * 处理 js 用到的图片
  * 约定使用 //<# {path: img/path, alias: imgAlias} #>
+ * TODO 待删除
  */
 function imgInJs(options) {
 	const opts = options || {};
@@ -93,14 +94,66 @@ function imgInJs(options) {
 			if (filter(id)) {
 				code.replace(/\/\/\s*<\s*#\s*(\{[^\}]*\})\s*#\s*>/gi, (match, capture) => {
 					try {
-						utils.collectImgInJs(eval('(' + capture + ')'));
+						let imgInfo = eval('(' + capture + ')');
+						let paths = {};
+						let item;
+						
+						paths.extname = path.extname(imgInfo.path);
+						paths.absolute = path.resolve(process.cwd(), imgInfo.path);
+						paths.basename = path.basename(imgInfo.path);
+						paths.alias = imgInfo.alias;
+						
+						item = storage.addImg(paths.absolute, paths);
+						
+						// 如果当前图片未在 css 或者 html 中使用，不做替换
+						if (paths.alias !== item.alias) {
+							code = code.replace(new RegExp(paths.basename, 'gi'), item.alias);
+						}
 					} catch(err) {
 						utils.error('Parse json failed.', new Error(capture + ' is not a json string.'));
 					}
 					return match;
 				});
 			}
-			return null;
+			return {
+				code: code,
+				map: {
+					mappings: ''
+				}
+			};
+		}
+	};
+}
+
+/**
+ * 自定义编译 js 阶段的钩子
+ */
+function hookInJs(options) {
+	const opts = options || {};
+	const filter = createFilter(opts.include, opts.exclude);
+	return {
+		name: 'hookInJs',
+		transform(code, id) {
+			if (filter(id)) {
+				code = code.replace(/\bFIY\b\.([0-9a-zA-Z]+)\b\(([^\)]*)\)/gi, (match, method, param) => {
+					let hook = hooks[method];
+					let params = param.split(',').map(val => {
+						return eval('(' + val.trim() + ')');
+					});
+					if (!hook) {
+						utils.error(`The ${method} isn't a hook methods`, new Error(`Please check ${id} file`));
+					}
+					params.push(id);
+					return hook.apply(null, params) || match;
+				});
+				
+			}
+			return {
+				code: code,
+				map: {
+					mappings: ''
+				}
+			};
 		}
 	};
 }
@@ -213,9 +266,9 @@ function scan(jsinfo) {
 		let promises = [];
 		let config = conf[process.env.NODE_ENV];
 		let inputOptions = Object.assign({}, base.rollup.input, {
-			input: jsinfo.entry.absolute,
+			input: jsinfo.absolute,
 			plugins: [
-				imgInJs({
+				hookInJs({
 					include: ['src/**/*.js'],
 					exclude: ['node_modules/**']
 				}),
@@ -256,7 +309,7 @@ function scan(jsinfo) {
 			]
 		});
 		let outputOptions = Object.assign({}, base.rollup.output, {
-			file: `${dest.js}${jsinfo.entry.alias}`,
+			file: `${dest.js}${jsinfo.alias}`,
 			sourcemap: process.env.NODE_ENV === 'development' // 只在开发环境生成 sourcemap
 		});
 
@@ -270,30 +323,30 @@ function scan(jsinfo) {
 		);
 
 		// 合并外部引入的非http(s) js 文件
-		let external = [];
-		if (jsinfo.external.list.length) {
-			jsinfo.external.list.forEach(item => {
-				external.push(new Promise((resolvz, rejecz) => {
+		if (jsinfo.external.length) {
+			let external = jsinfo.external.map(item => {
+				return new Promise(($resolve, $reject) => {
 					fs.readFile(item.absolute, (err, content) => {
 						if (err) {
-							rejecz({
+							$reject({
 								title: `Concat ${item.absolute} file failed.`,
 								message: new Error(err)
 							});
 							throw err;
 						}
-						
-						resolvz(content.toString('utf8'));
+
+						$resolve(content.toString('utf8'));
 					});
-				}));
+				});
 			});
+			
 			promises.push(
 				Promise.all(external).then(res => {
 					// 写入 bundle.js 文件
-					write(`${dest.js}${jsinfo.external.alias}`, UglifyJS.minify(res.join(';'), base.rollup.minify).code, (err) => { 
+					write(`${dest.js}bundle-${jsinfo.hash}.js`, UglifyJS.minify(res.join(';'), base.rollup.minify).code, (err) => { 
 						if (err) {
 							reject({
-								title: `Write ${jsinfo.external.alias} file failed.`,
+								title: `Write bundle-${jsinfo.hash}.js file failed.`,
 								message: new Error(err)
 							});
 							throw err;
@@ -328,17 +381,17 @@ module.exports.build = function (jsList) {
 			return resolve();
 		}
 		
-		keys.forEach(item => {
-			let jsinfo = jsList[item];
-
-			if (!jsinfo.entry.absolute) {
-				let err =  new Error('Please use the sign of entry in base.js to ' + item);
+		keys.forEach(htmlpath => {
+			let jsinfo = jsList[htmlpath];
+			
+			if (!jsinfo.absolute) {
+				let err =  new Error('Please use the sign of entry in base.js to ' + htmlpath);
 				utils.error('No entry file specified.', err);
 				throw err;
 			}
-
 			promises.push(scan(jsinfo));
 		});
+		
 		Promise.all(promises).then(reslists => {
 			resolve();
 			utils.log('Finish compiling js files.');

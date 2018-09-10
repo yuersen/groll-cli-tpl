@@ -11,6 +11,10 @@ const CleanCSS = require('clean-css');
 const autoprefixer = require('autoprefixer');
 const postcss = require('postcss');
 const storage = require('./storage.js');
+const dest = require('./dest.js').paths();
+
+let conf = storage.getConfig();
+let prefix = conf[process.env.NODE_ENV].assetsPublicPath;
 
 /**
  * 生成 MD5 hash
@@ -24,9 +28,18 @@ module.exports.createHash = input => {
  * @param {String} curUrl - 当前的 url
  * @param {String} preUrl - 待计算 url
  */
-module.exports.absolute = (curUrl, preUrl) => {
-	return path.resolve(__dirname, '../', path.dirname(curUrl), preUrl);
+module.exports.absolute = (parUrl, curUrl) => {
+	return path.resolve(__dirname, '../', path.dirname(parUrl), curUrl);
 };
+
+/**
+ * 把一个路径或路径片段的序列解析为一个绝对路径
+ * 若路径为具体的文件，使用目录计算绝对位置
+ */
+module.exports.resolve = function(fpath, spath) {
+	let extname = path.extname(fpath);
+	return path.resolve(extname ? path.dirname(fpath) : fpath, spath);
+}
 
 /**
  * 输出错误信息
@@ -111,7 +124,7 @@ module.exports.cleanCss = function(input, options) {
 module.exports.urlInCss = function (cssText, paths, islink) {
 	// 匹配非 http(s) 和 data: 资源
 	let urlexp = /\burl\b\s*\(\s*['"]?((?!.*?(http(s?))|(data):)+[^\)'"]*)['"]?\s*\)/gi;
-	let prefix = islink ? '../' : './';
+//	let prefix = islink ? '../' : './';
 
 	// 获取当前扫描图片或者字体真实路径
 	// 图片或者字体可能在当前 css 中，可能在依赖的 css 中
@@ -138,29 +151,13 @@ module.exports.urlInCss = function (cssText, paths, islink) {
 		pzth.alias = `${pzth.basename}-${module.exports.createHash(pzth.absolute)}${pzth.extname}`;
 
 		if (['.png', '.jpg', 'jpeg', '.gif'].indexOf(pzth.extname) !== -1) {
-			item = storage.addImg(pzth.absolute, pzth);
-			return match.replace(capture, `${prefix}img/${item.alias}`);
+			item = storage.addImg(pzth.absolute, pzth, true);
+			return match.replace(capture, `${prefix}${dest.assetDir}img/${item.alias}`);
 		} else {
 			item = storage.addFont(pzth.absolute, pzth);
 			urls[1] = urls[1] ? '?' + urls[1] : '';
-			return match.replace(capture, `${prefix}font/${item.alias}${urls[1]}`);
+			return match.replace(capture, `${prefix}${dest.assetDir}font/${item.alias}${urls[1]}`);
 		}
 	});
 	return cssText;
-};
-
-/**
- * 处理 js 中图片路径
- */
-module.exports.collectImgInJs = function(imgs) {
-	imgs = Array.isArray(imgs) ? imgs : [imgs];
-	imgs.forEach(item => {
-		let paths = {};
-		paths.extname = path.extname(item.path);
-		paths.absolute = path.resolve(process.cwd(), item.path);
-		paths.basename = path.basename(item.path);
-		paths.alias = item.alias;
-
-		storage.addImg(paths.absolute, paths);
-	});
 };

@@ -422,3 +422,6 @@ export default Vue.component('hello-groll', {
 	- 使用 autoprefixer + postcss 对 css 进行兼容前缀添加
 - 2018/08/24
 	- 解决 uglifyjs 导致无法正常生成 sourcemap
+- 2018/09/10
+	- 新增构建钩子 hook.js ，编译阶段执行
+	- 新增静态资源(js/css/img/font)目录支持，默认 `static`

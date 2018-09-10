@@ -8,7 +8,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const imagemin = require('imagemin');
-const dest = require('./dest.js');
+const dest = require('./dest.js').paths();
 const utils = require('./utils.js');
 
 /**

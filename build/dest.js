@@ -4,13 +4,30 @@
  */
 const storage = require('./storage.js');
 const conf = storage.getConfig();
-let basePath = `./dist/${conf.version ? conf.version + '/' : ''}`;
+//let basePath = `./dist/${conf.version ? conf.version + '/' : ''}`;
 
-module.exports = {
-	base: basePath,
-	html: basePath,
-	js: `${basePath}js/`,
-	css: `${basePath}css/`,
-	img: `${basePath}img/`,
-	font: `${basePath}font/`
+let cache = {};
+function create(version) {
+	let base = './dist/';
+	let assetDir = 'static' + version + '/';
+	return {
+		base: base,
+		html: base,
+		assetDir: assetDir,
+		js: `${base}${assetDir}js/`,
+		css: `${base}${assetDir}css/`,
+		img: `${base}${assetDir}img/`,
+		font: `${base}${assetDir}font/`
+	};
+}
+// 取默认的配置中版本
+cache = create(conf.version || '');
+module.exports.paths = function() {
+	return cache;
+};
+
+// 从外部指定版本等信息
+module.exports.update = function(version) {
+	cache = create(version);
+	return cache;
 };

@@ -2,7 +2,7 @@ const del = require('del');
 const argvs = require('yargs').argv
 const chokidar = require('chokidar');
 const storage = require('./storage.js');
-const utils	= require('./utils.js');
+const dest = require('./dest.js');
 const pkg = {};
 
 // 处理用户自定义指定配置文件并与默认的进行合并处理
@@ -11,7 +11,12 @@ if (argvs.config) {
 	storage.setConfig(require('../' + argvs.config) || {});
 }
 
-['dest', 'html', 'css', 'rollup', 'img', 'font', 'server'].forEach(pkn => {
+// 若命令行中通过 --v 1.0.0 指定构建版本，更新 dest 中的构建路径
+if (argvs.v) {
+	dest.update(argvs.v);
+}
+
+['utils', 'html', 'css', 'rollup', 'img', 'font', 'server'].forEach(pkn => {
 	pkg[pkn] = require(`./${pkn}.js`);
 });
 
@@ -19,9 +24,6 @@ if (argvs.config) {
  * 构建所有静态资源
  */
 function build(callback) {
-	// 首先把图片白名单放入storage
-	// utils.collectImgInJs(base.img.white);
-
 	// 从命令行获取构建入口
 	// 如果没有指定，则使用配置 config/index.js 中的 entry 作为入口
 	pkg.html.build(argvs._)
@@ -36,8 +38,8 @@ function build(callback) {
 		});
 }
 
-del(pkg.dest.base, {force: true}).then(() => {
-	utils.log('Start building, please wait a moment.');
+del(dest.paths().base, {force: true}).then(() => {
+	pkg.utils.log('Start building, please wait a moment.');
 	if (process.env.NODE_ENV === 'development') {
 		build(() => {
 			// 创建服务，监听文件变化
@@ -48,6 +50,7 @@ del(pkg.dest.base, {force: true}).then(() => {
 				'./src/**/*.css',
 				'./src/**/*.less'
 			]).on('change', (path, stats) => {
+				storage.clear();
 				build(() => {
 					pkg.server.browserSync.reload();
 				});

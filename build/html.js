@@ -12,7 +12,7 @@ const write = require('write');
 const through2 = require('through2');
 const minify = require('html-minifier').minify;
 const base = require('./base.js');
-const dest = require('./dest.js');
+const dest = require('./dest.js').paths();
 const utils = require('./utils.js');
 const storage = require('./storage.js');
 
@@ -89,15 +89,15 @@ function scan(pattern) {
 function processUrl(content, filepath) {
 	let env = process.env.NODE_ENV;
 	let prefix = conf[env].assetsPublicPath;
-	let removeExternalScriptTag = -1;
+	let hash = utils.createHash(filepath);
 
 	function getPaths(url, filepath) {
 		let paths = {};
 		paths.extname = path.extname(url);
 		paths.basename = path.basename(url, paths.extname);
 		paths.absolute = utils.absolute(filepath, url);
-		paths.hash = utils.createHash(filepath);
-		paths.alias = `${paths.basename}-${paths.hash}${paths.extname}`;
+		paths.hash = hash;
+		paths.alias = `${paths.basename}-${hash}${paths.extname}`;
 		return paths;
 	}
 
@@ -105,19 +105,19 @@ function processUrl(content, filepath) {
 		// 处理 script 标签引入的 js 文件，http(s) 资源忽略
 		.replace(scriptExp, (match, capture) => {
 			let isEntry = match.indexOf(base.rollup.sign.entry) !== -1;
-			let paths = getPaths(capture, filepath);
+			let paths = getPaths(capture, filepath), item;
 
 			if (!paths.extname) { // 空 url 不处理
 				return match;
 			}
 			
 			if (isEntry) { // entry js file
-				storage.addEntry(filepath, paths);
+				item = storage.addJs(filepath, paths, true);
+				return match.replace(capture,  `${prefix}${dest.assetDir}js/${item.alias}`);
 			} else {
-				storage.addExternal(filepath, paths);
-				removeExternalScriptTag += 1;
+				item = storage.updateJsExternal(filepath, paths);
+				return item.external.length > 1 ? '' : match.replace(capture,  `${prefix}${dest.assetDir}js/bundle-${hash}.js`);
 			}
-			return !isEntry && removeExternalScriptTag >= 1 ? '' : match.replace(capture,  `${prefix}js/${paths.alias}`);
 		})
 		// 处理 link 标签引入的 css 文件，http(s) 资源忽略
 		.replace(linkExp, (match, capture) => {
@@ -128,7 +128,7 @@ function processUrl(content, filepath) {
 			}
 
 			let item = storage.addCss(paths.absolute, paths);
-			return match.replace(capture, `${prefix}css/${item.alias}`);
+			return match.replace(capture, `${prefix}${dest.assetDir}css/${item.alias}`);
 		})
 		// 处理 img 标签引入的 image 文件，http(s) 资源忽略
 		.replace(imgExp, (match, capture) => {
@@ -139,7 +139,7 @@ function processUrl(content, filepath) {
 			}
 
 			let item = storage.addImg(paths.absolute, paths);
-			return match.replace(capture, `${prefix}img/${item.alias}`);
+			return match.replace(capture, `${prefix}${dest.assetDir}img/${item.alias}`);
 		});
 	return content;
 }

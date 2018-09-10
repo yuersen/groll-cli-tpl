@@ -1,6 +1,6 @@
 const browserSync = require('browser-sync').create(); // browsersync
 const proxyMiddleware = require('http-proxy-middleware'); // proxy
-const dest = require('./dest.js');
+const dest = require('./dest.js').paths();
 const storage = require('./storage.js');
 
 let conf = storage.getConfig();

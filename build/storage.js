@@ -29,39 +29,31 @@ module.exports.getImg = function() {
  * 		alias: 'alias/js'
  * 	}
  * }
-h */
+ */
 let js = {};
-let baseJsInfo = {
-	entry: {
-		alias: '',
-		basename: '',
-		extname: '',
-		absolute: '',
-	},
-	external: {
-		list: [],
-		alias: ''
-	}
-};
-module.exports.addJs = function(htmlpath, val) {
+module.exports.addJs = function(htmlpath, val, cover) {
 	if (!js[htmlpath]) {
-		js[htmlpath] = Object.assign({}, baseJsInfo, val || {});
+		js[htmlpath] = merge({}, {
+			alias: '',
+			basename: '',
+			hash: '',
+			extname: '',
+			absolute: '',
+			external: []
+		}, val || {});
+	}
+	if (cover) {
+		js[htmlpath] = Object.assign(js[htmlpath], val);
 	}
 	return js[htmlpath];
 };
 module.exports.getJs = function() {
 	return js;
 };
-module.exports.addEntry = function(htmlpath, jsinfo) {
+module.exports.updateJsExternal = function(htmlpath, external) {
 	let item = module.exports.addJs(htmlpath);
-	item.entry = jsinfo;
-	item.external.alias = `bundle-${jsinfo.hash}.js`;
-	return jsinfo;
-};
-module.exports.addExternal = function(htmlpath, jspath) {
-	let item = module.exports.addJs(htmlpath);
-	item.external.list.push(jspath);
-	return item.external;
+	item.external.push(external);
+	return item;
 };
 
 // 存储所有的 css 文件信息
@@ -100,3 +92,17 @@ module.exports.setConfig = function(cong) {
 module.exports.getConfig = function() {
 	return config;
 };
+
+function clean (obj) {
+	for (let i in obj) {
+		delete obj[i];
+	}
+	return obj;
+}
+module.exports.clear = function() {
+	js = clean(js);
+	images = clean(images);
+	css = clean(css);
+	font = clean(font);
+};
+

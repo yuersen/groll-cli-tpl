@@ -6,7 +6,7 @@
  */
 const fs = require('fs');
 const write = require('write');
-const dest = require('./dest.js');
+const dest = require('./dest.js').paths();
 const utils = require('./utils.js');
 
 /**

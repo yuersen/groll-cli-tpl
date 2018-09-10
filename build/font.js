@@ -3,7 +3,7 @@
  * @author pxy0809
  */
 const fs = require('fs-extra');
-const dest = require('./dest.js');
+const dest = require('./dest.js').paths();
 const utils = require('./utils.js');
 
 function scan(fontPath, alias) {
