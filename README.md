@@ -425,3 +425,5 @@ export default Vue.component('hello-groll', {
 - 2018/09/10
 	- 新增构建钩子 hook.js ，编译阶段执行
 	- 新增静态资源(js/css/img/font)目录支持，默认 `static`
+- 2018/10/10
+	- 优化HTML文件过大（>=64KB），分布读取解析

@@ -41,7 +41,8 @@ function scan(pattern) {
 			files.forEach(filepath => {
 				promises.push(
 					new Promise((resolvz, rejecz) => {
-						fs.createReadStream(filepath)
+						// 控制 HTML 文档在 <= 2M 直接一次读取
+						fs.createReadStream(filepath, {highWaterMark: 2 * 1024 * 1024})
 							.pipe(through2.obj((file, enc, callback) => {
 								let content = file.toString('utf8');
 
