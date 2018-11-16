@@ -1,400 +1,141 @@
 /**
- * 对 js 文件进行处理
- * 1. 扫描所有的 url（背景/字体），供图片打包处理使用
- * 2. manifest 化处理
- * 3. 压缩
+ * @file Js 资源类
+ * @author pxyamos
+ * @description 使用 rollup 对当前 Js 进行构建处理
  */
-const fs = require('fs');
-const write = require('write');
-const path = require('path');
+
+const File = require('./file.js');
 const rollup = require('rollup');
-const {createFilter, dataToEsm} = require('rollup-pluginutils');
+
+// rollup plugins
+const hook = require('./rollplugin/hook.js');
 const includePath = require('rollup-plugin-includepaths');
 const babel = require('rollup-plugin-babel');
 const nodeResolve = require('rollup-plugin-node-resolve');
 const commonjs = require('rollup-plugin-commonjs');
 const replace = require('rollup-plugin-re');
-const UglifyJS = require('uglify-js');
-const {minify} = require('html-minifier');
-const {CLIEngine} = require('eslint');
-const base = require('./base.js');
-const dest = require('./dest.js').paths();
-const utils = require('./utils.js');
+const processText = require('./rollplugin/text.js');
+const processCss = require('./rollplugin/css.js');
+const uglifyJs = require('./rollplugin/uglify.js');
+const processImage = require('./rollplugin/image.js');
+const processJson = require('./rollplugin/json.js');
+const eslint = require('./rollplugin/eslint.js');
 const storage = require('./storage.js');
-const hooks = require('./hook.js');
-let conf = storage.getConfig();
+const assign = Object.assign;
+const config = storage.getConfig();
+const version = storage.getVersion();
 
-/**
- * 处理 import 'xx.html' 或者 import 'xx.tpl'
- */
-function importText(include, exclude) {
-	const filter = createFilter(include, exclude);
-	return {
-		name: 'importText',
-		transform(code, id) {
-			if (filter(id)) {
-				return {
-					// 使用 html-minifier 压缩 html 片段
-					code: `export default ${JSON.stringify(minify(code, base.html.minify))};`,
-					map: { mappings: '' }
-				};
-			}
-		}
-	};
-}
+module.exports = class JsFile extends File {
+  constructor(filepath, realpath) {
+    super(filepath, realpath);
+    this.fileType = 'js';
+    this.distpath = `./dist/static${version}/js/${this.alias}`;
+    this.packpath = `${config.assetsPublicPath}static${version}/js/${this.alias}`;
+  }
 
-/**
- * 处理 import 'xx.css'
- */
-function cssInJs(options) {
-	const opts = options || {};
-	const filter = createFilter(opts.include, opts.exclude);
-	return {
-		name: 'cssInJs',
-		transform(code, id) {
-			return new Promise((resolve, reject) => {
-				if (!filter(id)) {
-					return resolve(null);
-				}
+  /**
+   * 编译JS文件
+   * @returns {Promise}
+   */
+  compile() {
+    let that = this;
+    return new Promise((resolve, reject) => {
+      let filter = {
+        include: ['src/**/*.js'],
+        exclude: ['node_modules/**']
+      };
+      let inputOpt = {
+        input: that.realpath,
+        external: ['vue', 'axios'],
+        plugins: [
+          // 函数钩子，执行预定义函数
+          hook(filter),
+          // 处理相对路径
+          includePath(assign({}, filter, {
+            paths: [
+              'src/views',
+              'src/components',
+              'src/mock',
+              'node_modules'
+            ]
+          })),
+          // 处理 js 中引入的全局变量 process.env.xxx
+          replace(assign({}, filter, {
+            patterns: [{
+              transform(code, id) {
+                return code.replace(/\bprocess\.env\.(\w+)\b/gi, (match, capture) => {
+                  return JSON.stringify(config[capture] || null);
+                });
+              }
+            }]
+          })),
+          // 处理模板文件，支持.html/.tpl/.htm
+          processText(assign({}, filter, {
+            include: [
+              'src/**/*.html',
+              'src/**/*.tpl',
+              'src/**/*.htm'
+            ]
+          })),
+          processCss(assign({}, filter, {
+            include: [
+              'src/**/*.css',
+              'src/**/*.less'
+            ]
+          }), that),
+          processJson(), // 支持 import 'xx.json'
+          processImage(assign({}, filter, {
+            include: [
+              'src/**/*.jpg',
+              'src/**/*.jpeg',
+              'src/**/*.png',
+              'src/**/*.gif'
+            ]
+          })),
+          nodeResolve({ // commonjs
+            jsnext: true,
+            main: true,
+            browser: true
+          }),
+          eslint(filter, true),
+          commonjs(), // support commonjs
+          babel(filter),
+          (process.env.NODE_ENV !== 'development' && uglifyJs())
+        ]
+      };
+      let outputOpt = {
+        file: that.distpath,
+        format: 'iife',
+        globals: { // 全局变量
+          vue: 'Vue',
+          axios: 'axios'
+        },
+        sourcemap: process.env.NODE_ENV === 'development' // 只在开发环境生成 sourcemap
+      };
 
-				return Promise.resolve(utils.less(code).then(res => {
-					let paths = res.imports;
-					paths.unshift(id);
+      // 使用 rollup 编译处理
+      rollup.rollup(inputOpt)
+        .then(bundle => {
+          bundle.generate(outputOpt)
+            .then(result => {
+              that.procontent = result.code;
+              resolve();
+            })
+            .catch(err => {
+              that.logError(err);
+            });
+        })
+        .catch(err => {
+          that.logError(err);
+        });
+    });
+  }
 
-					let cssText = utils.urlInCss(res.css, paths, false);
-					let output = `
-            \nvar css = ${JSON.stringify(cssText)};
-            \export default 'css';
-            \nimport styleInject from 'style-inject';
-            \nstyleInject(css);
-          `;
-					return resolve({
-						code: output,
-						map: {
-							mappings: ''
-						}
-					})
-				}));
-			});
-		}
-	};
-}
-
-/**
- * 处理 js 用到的图片
- * 约定使用 //<# {path: img/path, alias: imgAlias} #>
- * TODO 待删除
- */
-function imgInJs(options) {
-	const opts = options || {};
-	const filter = createFilter(opts.include, opts.exclude);
-	return {
-		name: 'imgInJs',
-		transform(code, id) {
-			if (filter(id)) {
-				code.replace(/\/\/\s*<\s*#\s*(\{[^\}]*\})\s*#\s*>/gi, (match, capture) => {
-					try {
-						let imgInfo = eval('(' + capture + ')');
-						let paths = {};
-						let item;
-						
-						paths.extname = path.extname(imgInfo.path);
-						paths.absolute = path.resolve(process.cwd(), imgInfo.path);
-						paths.basename = path.basename(imgInfo.path);
-						paths.alias = imgInfo.alias;
-						
-						item = storage.addImg(paths.absolute, paths);
-						
-						// 如果当前图片未在 css 或者 html 中使用，不做替换
-						if (paths.alias !== item.alias) {
-							code = code.replace(new RegExp(paths.basename, 'gi'), item.alias);
-						}
-					} catch(err) {
-						utils.error('Parse json failed.', new Error(capture + ' is not a json string.'));
-					}
-					return match;
-				});
-			}
-			return {
-				code: code,
-				map: {
-					mappings: ''
-				}
-			};
-		}
-	};
-}
-
-/**
- * 自定义编译 js 阶段的钩子
- */
-function hookInJs(options) {
-	const opts = options || {};
-	const filter = createFilter(opts.include, opts.exclude);
-	return {
-		name: 'hookInJs',
-		transform(code, id) {
-			if (filter(id)) {
-				code = code.replace(/\bFIY\b\.([0-9a-zA-Z]+)\b\(([^\)]*)\)/gi, (match, method, param) => {
-					let hook = hooks[method];
-					let params = param.split(',').map(val => {
-						return eval('(' + val.trim() + ')');
-					});
-					if (!hook) {
-						utils.error(`The ${method} isn't a hook methods`, new Error(`Please check ${id} file`));
-					}
-					params.push(id);
-					return hook.apply(null, params) || match;
-				});
-				
-			}
-			return {
-				code: code,
-				map: {
-					mappings: ''
-				}
-			};
-		}
-	};
-}
-
-/**
- * 压缩 js
- */
-function uglifyJs() {
-	return { // 压缩 js 代码
-  	name: 'uglifyJs',
-	 	transformBundle(code) {
-	 		return UglifyJS.minify(code, base.rollup.minify);
-	 	}
-	};
-}
-
-/**
- * eslint
- */
-function eslint(options, useEslint) {
-	const cli = new CLIEngine(options);
-	let formatter = options.formatter;
-
-	if (!useEslint) {
-  	return {
-  		name: 'eslint',
-    	transform(code, id) {
-    		return null;
-    	}
-  	};
-	}
-
-	if (typeof formatter !== 'function') {
-		formatter = cli.getFormatter(formatter || 'stylish');
-	}
-
-	const filter = createFilter(
-		options.include,
-		options.exclude || /node_modules/
-	);
-	const normalizePath = function (id) {
-		return path.relative(process.cwd(), id).split(path.sep).join('/');
-	};
-	return {
-		name: 'eslint',
-		transform(code, id) {
-			const file = normalizePath(id);
-			const report = cli.executeOnText(code, file);
-			const result = formatter(report.results);
-			const hasWarnings = options.throwOnWarning && report.warningCount !== 0;
-			const hasErrors = options.throwOnError && report.errorCount !== 0;
-
-			if (cli.isPathIgnored(file) || !filter(id)) {
-				return null;
-			}
-			if (report.warningCount === 0 && report.errorCount === 0) {
-				return null;
-			}
-			if (result) {
-				console.log(result);
-			}
-			if (hasWarnings && hasErrors) {
-				throw Error('Warnings or errors were found');
-			}
-			if (hasWarnings) {
-				throw Error('Warnings were found');
-			}
-			if (hasErrors) {
-				throw Error('Errors were found');
-			}
-		}
-	};
-}
-
-/**
- * 处理 import 'xx.json'
- */
-function importJson(options) {
-	options = options || {};
-	const filter = createFilter(options.include, options.exclude);
-	const indent = 'indent' in options ? options.indent : '\t';
-	return {
-		name: 'importJson',
-		transform(json, id) {
-			if (id.slice(-5) !== '.json') {
-				return null;
-			}
-			if (!filter(id)) {
-				return null;
-			}
-
-			const data = JSON.parse(json);
-			if (Object.prototype.toString.call(data) !== '[object Object]') {
-				return {code: `export default ${json};\n`, map: {mappings: ''}};
-			}
-
-			return {
-				code: dataToEsm(data, {preferConst: options.preferConst, indent}),
-				map: {mappings: ''}
-			};
-		}
-	};
-}
-
-/**
- * 处理 js 文件
- */
-function scan(jsinfo) {
-	return new Promise((resolve, reject) => {
-		let promises = [];
-		let config = conf[process.env.NODE_ENV];
-		let inputOptions = Object.assign({}, base.rollup.input, {
-			input: jsinfo.absolute,
-			plugins: [
-				hookInJs({
-					include: ['src/**/*.js'],
-					exclude: ['node_modules/**']
-				}),
-				includePath({ // 处理相对路径
-					include: {},
-					paths: ['src/views', 'src/components', 'src/mock', 'node_modules']
-				}),
-				replace({ // 处理 js中引入的全局变量 process.env.xxx
-					include: 'src/**/*.js',
-					exclude: 'node_modules/**',
-					patterns: [{
-						transform (code, id) { // replace by function
-							return code.replace(/\bprocess\.env\.(\w+)\b/gi, (match, capture) => {
-								return JSON.stringify(config[capture] || null);
-							});
-			      }
-					}]
-				}),
-				importText(['src/**/*.html']),
-				cssInJs({
-					include: ['src/**/*.css']
-				}),
-				importJson(), // 支持 import 'xx.json'
-				nodeResolve({ // commonjs
-					jsnext: true,
-					main: true,
-					browser: true
-				}),
-				commonjs(), // support commonjs
-				babel({ // babel
-					exclude: 'node_modules/**'
-				}),
-				eslint({
-					include: 'src/**/*.js',
-					exclude: ['node_modules/**']
-				}, conf.development.useEslint),
-				(process.env.NODE_ENV !== 'development' && uglifyJs())
-			]
-		});
-		let outputOptions = Object.assign({}, base.rollup.output, {
-			file: `${dest.js}${jsinfo.alias}`,
-			sourcemap: process.env.NODE_ENV === 'development' // 只在开发环境生成 sourcemap
-		});
-
-		promises.push(
-			rollup.rollup(inputOptions).then(bundle => {
-				bundle.write(outputOptions);
-				// resolve();
-			}).catch(err => {
-				utils.error('Rollup running error reporting', err);
-			})
-		);
-
-		// 合并外部引入的非http(s) js 文件
-		if (jsinfo.external.length) {
-			let external = jsinfo.external.map(item => {
-				return new Promise(($resolve, $reject) => {
-					fs.readFile(item.absolute, (err, content) => {
-						if (err) {
-							$reject({
-								title: `Concat ${item.absolute} file failed.`,
-								message: new Error(err)
-							});
-							throw err;
-						}
-
-						$resolve(content.toString('utf8'));
-					});
-				});
-			});
-			
-			promises.push(
-				Promise.all(external).then(res => {
-					// 写入 bundle.js 文件
-					write(`${dest.js}bundle-${jsinfo.hash}.js`, UglifyJS.minify(res.join(';'), base.rollup.minify).code, (err) => { 
-						if (err) {
-							reject({
-								title: `Write bundle-${jsinfo.hash}.js file failed.`,
-								message: new Error(err)
-							});
-							throw err;
-						}
-						resolve();
-					});
-				})
-			);
-		}
-
-		Promise.all(promises).then(() => {
-			resolve();
-		});
-	});
-}
-
-/**
- * 编译 js
- * @param {Object[]} jsList - js 文件信息列表
- * @param {String} jsList[].extname - 后缀
- * @param {String} jsList[].absolute - 绝对路径
- * @param {String} jsList[].basename - 文件名
- * @param {String} jsList[].alias - 文件别名，即文件名 + MD5(absolute)
- * @return {Promise}
- */
-module.exports.build = function (jsList) {
-	return new Promise((resolve, reject) => {
-		let promises = [];
-		let keys = Object.keys(jsList);
-
-		if (!keys.length) {
-			return resolve();
-		}
-		
-		keys.forEach(htmlpath => {
-			let jsinfo = jsList[htmlpath];
-			
-			if (!jsinfo.absolute) {
-				let err =  new Error('Please use the sign of entry in base.js to ' + htmlpath);
-				utils.error('No entry file specified.', err);
-				throw err;
-			}
-			promises.push(scan(jsinfo));
-		});
-		
-		Promise.all(promises).then(reslists => {
-			resolve();
-			utils.log('Finish compiling js files.');
-		});
-	});
+  /**
+   * JS文件内嵌化处理
+   * @returns {string}
+   */
+  inline() {
+    return `<script>${this.procontent}</script>`;
+  }
 };

@@ -1,43 +1,60 @@
 /**
- * 对字体文件进行处理
- * @author pxy0809
+ * @file Font 资源类
+ * @author pxyamos
  */
-const fs = require('fs-extra');
-const dest = require('./dest.js').paths();
-const utils = require('./utils.js');
+const File = require('./file.js');
+const storage = require('./storage.js');
+const config = storage.getConfig();
+const version = storage.getVersion();
 
-function scan(fontPath, alias) {
-	return new Promise((resolve, reject) => {
-		fs.copy(fontPath, `${dest.font}${alias}`)
-			.then(() => {
-				resolve();
-			})
-			.catch(err => {
-				reject({
-					title: `Copy ${fontPath} file failed.`,
-					message: new Error(err)
-				});
-			});
-	}).catch(err => {
-		utils.error(err);
-	});
-}
+module.exports = class FontFile extends File {
+  constructor(filepath, realpath) {
+    super(filepath, realpath);
+    this.fileType = 'font';
+    this.distpath = `./dist/static${version}/font/${this.alias}`;
+    this.packpath = `${config.assetsPublicPath}static${version}/font/${this.alias}`;
+  }
 
-module.exports.build = function (fontList) {
-	return new Promise((resolve, reject) => {
-		let promises = [];
-		let keys = Object.keys(fontList);
+  /**
+   * 编译 Font 资源
+   * @returns {Promise}
+   */
+  compile() {
+    let that = this;
+    return new Promise((resolve, reject) => {
+      super
+        .readFile(that.realpath)
+        .then(chunk => {
+          that.original = chunk;
+          resolve(chunk);
+        })
+        .catch(err => {
+          reject(`Compile ${that.realpath} failed.`);
+        });
+    });
+  }
 
-		if (!keys.length) {
-			return resolve();
-		}
+  /**
+   * 打包 Font 资源
+   * @returns {Promise}
+   */
+  pack() {
+    let that = this;
+    return new Promise((resolve, reject) => {
+      if (that.isInline) {
+        return resolve(that.toBase64());
+      }
+      super.writeFile();
+      return resolve(that.distpath);
+    });
+  }
 
-		keys.forEach(fontPath => {
-			promises.push(scan(fontPath, fontList[fontPath].alias));
-		});
-
-		Promise.all(promises).then(result => {
-			resolve();
-		});
-	});
+  /**
+   * Font 资源 base64 处理
+   * @returns {string}
+   */
+  toBase64() {
+    let ext = this.extname.replace('.', '');
+    return `data:image/${ext};base64,${this.procontent.toString('base64')}`;
+  }
 };

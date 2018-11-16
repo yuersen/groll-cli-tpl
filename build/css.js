@@ -1,78 +1,108 @@
 /**
- * Compile css files
- * @author pxy0809
- * 1. 扫描所有的 url（背景/字体），存入 storage
- * 2. 将已压缩 css 写入到指定的目录
+ * @file CSS 资源类
+ * @author pxyamos
  */
-const fs = require('fs');
-const write = require('write');
-const dest = require('./dest.js').paths();
-const utils = require('./utils.js');
+const File = require('./file.js');
+const ImageFile = require('./img.js');
+const FontFile = require('./font.js');
+const less = require('less');
+const postcss = require('postcss');
+const CleanCSS = require('clean-css');
+const autoprefixer = require('autoprefixer');
+const path = require('path');
+const storage = require('./storage.js');
+const config = storage.getConfig();
+const version = storage.getVersion();
 
-/**
- * 扫描指定的 css 并使用 postcss 处理
- * @param  {String} cssPath - css 文件路径
- * @param  {String} alias   - css 文件别名
- * @return {Promise}
- */
-function scan(cssPath, alias) {
-	return new Promise((resolve, reject) => {
-		fs.readFile(cssPath, (err, content) => {
-			if (err) {
-				reject({
-					title: `Read ${cssPath} file failed.`,
-					message: new Error(err)
-				});
-				throw err;
-			}
+module.exports = class CssFile extends File {
+  constructor(filepath, realpath) {
+    super(filepath, realpath);
+    this.fileType = 'css';
+    this.distpath = `./dist/static${version}/css/${this.alias}`;
+    this.packpath = `${config.assetsPublicPath}static${version}/css/${this.alias}`;
+    this.imported = false; // 标记当前的 css 是否是通过 import 导入
+  }
 
-			utils.less(content.toString('utf8')).then(res => {
-				let paths = res.imports;
-				paths.unshift(cssPath);
+  /**
+   * CSS资源编译
+   * @returns {Promise}
+   */
+  compile() {
+    let that = this;
+    return new Promise((resolve, reject) => {
+      super.readFile(that.realpath).then(content => {
+        content = content.toString('utf8');
+        less
+          .render(content, {
+            paths: [],
+            relativeUrls: true
+          })
+          .then(result => {
+            // from 和 to 属性，因不输出具体的 css 文件，可忽略
+            postcss([
+              autoprefixer({
+                browsers: ['> 1%', 'iOS 7', 'Android >= 3.2']
+              })
+            ])
+              .process(result.css, {
+                from: '/static/css/index.css',
+                to: '/static/css/index.css'
+              })
+              .then(res => {
+                that.procontent = that.cleanCSS(res.css);
+                that.scanUrlInCss(res.css);
+                resolve();
+              })
+              .catch(err => {
+                reject(err);
+              });
+          })
+          .catch(err => {
+            reject(err);
+          });
+      });
+    });
+  }
 
-				let cssText = utils.urlInCss(res.css, paths, true);
-				write(`${dest.css}${alias}`, cssText, (err) => { // 写入 css 文件
-					if (err) {
-						reject({
-							title: `Write ${cssPath} to ${dest.css}${alias} file failed.`,
-							message: new Error(err)
-						});
-						throw err;
-					}
-					resolve();
-				});
-			})
-		});
-	}).catch(err => {
-		utils.error(err);
-	});
-};
+  /**
+   * 压缩 CSS
+   * @param {string} cssText - css 文本
+   * @param {object} option - CleanCSS 配置
+   * @returns {string}
+   */
+  cleanCSS(cssText, option) {
+    return new CleanCSS(option || {}).minify(cssText).styles;
+  }
 
-/**
- * 编译 css
- * @param {Object[]} cssList - css 文件信息列表
- * @param {String} cssList[].extname - 后缀
- * @param {String} cssList[].absolute - 绝对路径
- * @param {String} cssList[].basename - 文件名
- * @param {String} cssList[].alias - 文件别名，即文件名 + MD5(absolute)
- * @return {Promise}
- */
-module.exports.build = function(cssList) {
-	return new Promise((resolve, reject) => {
-		let promises = [];
-		let keys = Object.keys(cssList);
+  /**
+   * 扫描 css 文本中的 url
+   * @param {string} cssText - css text
+   */
+  scanUrlInCss(cssText) {
+    let that = this;
+    let dirname = path.dirname(that.realpath);
+    cssText.replace(/url\(((\s*)(['"]?)(.+?)\2(\s*))\)/g, (match, capture) => {
+      let ext = path.extname(capture.replace(/\?_inline/, '')); // 处理内嵌 url
+      let abspath = path.resolve(dirname, capture);
+      let sourInfo = {
+        marker: `url(${path.normalize(capture).split(path.sep).join('/')})`
+      };
 
-		if (!keys.length) {
-			return resolve();
-		}
+      sourInfo.resource
+        = ['.jpg', '.jpeg', '.png', '.gif'].indexOf(ext) !== -1
+          ? new ImageFile(capture, abspath)
+          : new FontFile(capture, abspath);
+      that.dependencies.push(sourInfo);
+    });
+  }
 
-		keys.forEach(csspath => {
-			promises.push(scan(csspath, cssList[csspath].alias));
-		});
-
-		Promise.all(promises).then(reslists => {
-			resolve();
-			utils.log('Finish compiling css files.');
-		})
-	});
+  /**
+   * css 内嵌化处理
+   * @returns {string}
+   */
+  inline() {
+    return this.imported
+      ? this.procontent
+      : `<style>${this.procontent}</style>`;
+  }
 };
